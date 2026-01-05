@@ -74,7 +74,7 @@ export class SimpleRecorder {
     );
   }
 
-  setMode(mode: 'none' | 'recording' | 'inspecting' | 'standby') {
+  setMode(mode: 'none' | 'recording' | 'inspecting' | 'standby' | 'recording-inspecting' | 'assertingText' | 'assertingVisibility' | 'assertingValue' | 'assertingSnapshot') {
     this._mode = mode;
     this.recorder.setUIState(
       {
