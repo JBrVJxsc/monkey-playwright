@@ -17,6 +17,12 @@ export type {
   ElementInfo,
   Point,
   Signal,
+  // Code generation types
+  FrameDescription,
+  ActionInContext,
+  LanguageGeneratorOptions,
+  LanguageGenerator,
+  GeneratedCode,
 } from './types';
 
 // Export validation helpers

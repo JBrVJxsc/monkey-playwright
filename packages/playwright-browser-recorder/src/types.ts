@@ -220,3 +220,47 @@ export interface RecorderCallbacks {
   onElementPicked?: (element: ElementInfo) => void;
   onModeChange?: (mode: RecorderMode) => void;
 }
+
+// ============================================================================
+// Code generation types (from packages/playwright-core/src/server/codegen)
+// ============================================================================
+
+export interface FrameDescription {
+  pageGuid: string;
+  pageAlias: string;
+  framePath: string[];
+}
+
+export interface ActionInContext {
+  frame: FrameDescription;
+  description?: string;
+  action: Action;
+  startTime: number;
+  endTime?: number;
+}
+
+export interface LanguageGeneratorOptions {
+  browserName: string;
+  launchOptions: Record<string, unknown>;
+  contextOptions: Record<string, unknown>;
+  deviceName?: string;
+  saveStorage?: string;
+  generateAutoExpect?: boolean;
+}
+
+export interface LanguageGenerator {
+  id: string;
+  groupName: string;
+  name: string;
+  highlighter: string;
+  generateAction(actionInContext: ActionInContext): string;
+  generateHeader(options: LanguageGeneratorOptions): string;
+  generateFooter(saveStorage: string | undefined): string;
+}
+
+export interface GeneratedCode {
+  header: string;
+  footer: string;
+  actionTexts: string[];
+  text: string;
+}
