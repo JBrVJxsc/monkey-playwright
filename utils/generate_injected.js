@@ -73,7 +73,20 @@ const injectedScripts = [
     path.join(ROOT, 'packages', 'playwright-ct-core', 'lib', 'injected', 'packed'),
     path.join(ROOT, 'packages', 'playwright-ct-core', 'src', 'generated'),
     false,
-  ]
+  ],
+];
+
+/**
+ * IIFE bundles for direct browser injection (e.g., via CDP)
+ * Format: [entryPoint, outFile, globalName]
+ * @type {[string, string, string][]}
+ */
+const iifeBundles = [
+  [
+    path.join(ROOT, 'packages', 'injected', 'src', 'browserRecorder.ts'),
+    path.join(ROOT, 'packages', 'playwright-browser-recorder', 'dist', 'browserRecorder.js'),
+    'PlaywrightRecorder',
+  ],
 ];
 
 const modulePrefix = `
@@ -126,6 +139,7 @@ const inlineCSSPlugin = {
 };
 
 (async () => {
+  // Build CJS injected scripts with source string exports
   for (const [injected, outdir, generatedFolder, hasExports] of injectedScripts) {
     await fs.promises.mkdir(generatedFolder, { recursive: true });
     const buildOutput = await esbuild.build({
@@ -146,5 +160,24 @@ const inlineCSSPlugin = {
       content = await replaceEsbuildHeader(content, outFileJs);
     const newContent = `export const source = ${JSON.stringify(content)};`;
     await fs.promises.writeFile(path.join(generatedFolder, baseName.replace('.ts', 'Source.ts')), newContent);
+  }
+
+  // Build IIFE bundles for direct browser injection
+  for (const [entryPoint, outFile, globalName] of iifeBundles) {
+    const outDir = path.dirname(outFile);
+    await fs.promises.mkdir(outDir, { recursive: true });
+    const buildOutput = await esbuild.build({
+      entryPoints: [entryPoint],
+      bundle: true,
+      outfile: outFile,
+      format: 'iife',
+      globalName,
+      platform: 'browser',
+      target: 'ES2019',
+      plugins: [inlineCSSPlugin],
+      sourcemap: true,
+    });
+    for (const message of [...buildOutput.errors, ...buildOutput.warnings])
+      console.log(message.text);
   }
 })();

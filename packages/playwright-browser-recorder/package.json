@@ -1,0 +1,41 @@
+{
+  "name": "playwright-browser-recorder",
+  "private": true,
+  "version": "1.58.0-next",
+  "type": "module",
+  "description": "Playwright recorder browser bundle and types for direct browser injection",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anthropics/monkey-playwright.git"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "author": {
+    "name": "Anthropic"
+  },
+  "license": "Apache-2.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
+    "./browser": {
+      "types": "./dist/browser.d.ts",
+      "default": "./dist/browserRecorder.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "node scripts/build.cjs",
+    "prepare": "npm run build",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {}
+}
