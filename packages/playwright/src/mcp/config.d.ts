@@ -65,6 +65,11 @@ export type Config = {
     cdpHeaders?: Record<string, string>;
 
     /**
+     * Timeout in milliseconds for connecting to CDP endpoint. Defaults to 30000 (30 seconds). Pass 0 to disable timeout.
+     */
+    cdpTimeout?: number;
+
+    /**
      * Remote endpoint to connect to an existing Playwright server.
      */
     remoteEndpoint?: string;
@@ -195,4 +200,9 @@ export type Config = {
    * By default (false), file uploads are restricted to paths within the MCP roots only.
    */
   allowUnrestrictedFileAccess?: boolean;
+
+  /**
+   * Specify the language to use for code generation.
+   */
+  codegen?: 'typescript' | 'none';
 };

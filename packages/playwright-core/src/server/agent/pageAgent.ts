@@ -15,34 +15,32 @@
  */
 
 import fs from 'fs';
+import path from 'path';
 
 import { toolsForLoop } from './tool';
 import { debug } from '../../utilsBundle';
-import { Loop } from '../../mcpBundle';
+import { Loop, z as zod } from '../../mcpBundle';
 import { runAction } from './actionRunner';
 import { Context } from './context';
-import { Page } from '../page';
 import performTools from './performTools';
 import expectTools from './expectTools';
 
-import type { Progress } from '../progress';
-import type * as channels from '@protocol/channels';
-import type * as loopTypes from '@lowire/loop';
-import type * as actions from './actions';
+import * as actions from './actions';
 import type { ToolDefinition } from './tool';
+import type * as loopTypes from '@lowire/loop';
+import type { Progress } from '../progress';
 
-type Usage = {
-  turns: number,
-  inputTokens: number,
-  outputTokens: number,
+export type CallParams = {
+  cacheKey?: string;
+  maxTokens?: number;
+  maxActions?: number;
+  maxActionRetries?: number;
 };
 
-export async function pageAgentPerform(progress: Progress, page: Page, options: channels.PageAgentPerformParams): Promise<Usage> {
-  const context = new Context(progress, page);
-
-  const cacheKey = (options.key ?? options.task).trim();
+export async function pageAgentPerform(progress: Progress, context: Context, userTask: string, callParams: CallParams) {
+  const cacheKey = (callParams.cacheKey ?? userTask).trim();
   if (await cachedPerform(progress, context, cacheKey))
-    return { turns: 0, inputTokens: 0, outputTokens: 0 };
+    return;
 
   const task = `
 ### Instructions
@@ -50,20 +48,17 @@ export async function pageAgentPerform(progress: Progress, page: Page, options: 
 - Your reply should be a tool call that performs action the page".
 
 ### Task
-${options.task}
+${userTask}
 `;
 
-  const { usage } = await runLoop(progress, context, performTools, task, undefined, options);
+  await runLoop(progress, context, performTools, task, undefined, callParams);
   await updateCache(context, cacheKey);
-  return usage;
 }
 
-export async function pageAgentExpect(progress: Progress, page: Page, options: channels.PageAgentExpectParams): Promise<Usage> {
-  const context = new Context(progress, page);
-
-  const cacheKey = (options.key ?? options.expectation).trim();
+export async function pageAgentExpect(progress: Progress, context: Context, expectation: string, callParams: CallParams) {
+  const cacheKey = (callParams.cacheKey ?? expectation).trim();
   if (await cachedPerform(progress, context, cacheKey))
-    return { turns: 0, inputTokens: 0, outputTokens: 0 };
+    return;
 
   const task = `
 ### Instructions
@@ -71,132 +66,121 @@ export async function pageAgentExpect(progress: Progress, page: Page, options: c
 - You can call exactly one tool and it can't be report_results, must be one of the assertion tools.
 
 ### Expectation
-${options.expectation}
+${expectation}
 `;
 
-  const { usage } = await runLoop(progress, context, expectTools, task, undefined, options);
+  await runLoop(progress, context, expectTools, task, undefined, callParams);
   await updateCache(context, cacheKey);
-  return usage;
 }
 
-export async function pageAgentExtract(progress: Progress, page: Page, options: channels.PageAgentExtractParams): Promise<{
-  result: any,
-  usage: Usage
-}> {
-
-  const context = new Context(progress, page);
+export async function pageAgentExtract(progress: Progress, context: Context, query: string, schema: loopTypes.Schema, callParams: CallParams): Promise<any> {
 
   const task = `
 ### Instructions
 Extract the following information from the page. Do not perform any actions, just extract the information.
 
 ### Query
-${options.query}`;
-  const { result, usage } = await runLoop(progress, context, [], task, options.schema, options);
-  return { result, usage };
+${query}`;
+  const { result } = await runLoop(progress, context, [], task, schema, callParams);
+  return result;
 }
 
-async function runLoop(progress: Progress, context: Context, toolDefinitions: ToolDefinition[], userTask: string, resultSchema: loopTypes.Schema | undefined, options: {
-  maxTurns?: number;
-  maxTokens?: number;
-}): Promise<{
-  result: any,
-  usage: Usage
+async function runLoop(progress: Progress, context: Context, toolDefinitions: ToolDefinition[], userTask: string, resultSchema: loopTypes.Schema | undefined, params: CallParams): Promise<{
+  result: any
 }> {
   const { page } = context;
-  const browserContext = page.browserContext;
-  if (!browserContext._options.agent?.provider || !browserContext._options.agent?.model)
-    throw new Error(`This action requires the agent provider and model to be set on the browser context`);
+  if (!context.agentParams.api || !context.agentParams.model)
+    throw new Error(`This action requires the API and API key to be set on the page agent. Did you mean to --run-agents=missing?`);
+  if (!context.agentParams.apiKey)
+    throw new Error(`This action requires API key to be set on the page agent.`);
 
   const { full } = await page.snapshotForAI(progress);
-  const { tools, callTool } = toolsForLoop(context, toolDefinitions, { resultSchema });
+  const { tools, callTool, reportedResult, refusedToPerformReason } = toolsForLoop(progress, context, toolDefinitions, { resultSchema, refuseToPerform: 'allow' });
+  const secrets = Object.fromEntries((context.agentParams.secrets || [])?.map(s => ([s.name, s.value])));
 
-  page.emit(Page.Events.AgentTurn, { role: 'user', message: userTask });
+  const apiCacheTextBefore = context.agentParams.apiCacheFile ?
+    await fs.promises.readFile(context.agentParams.apiCacheFile, 'utf-8').catch(() => '{}') : '{}';
+  const apiCacheBefore = JSON.parse(apiCacheTextBefore);
 
-  const limits = context.limits(options);
-  let turns = 0;
-  const loop = new Loop(browserContext._options.agent.provider as any, {
-    model: browserContext._options.agent.model,
+  const loop = new Loop({
+    api: context.agentParams.api as any,
+    apiEndpoint: context.agentParams.apiEndpoint,
+    apiKey: context.agentParams.apiKey,
+    apiTimeout: context.agentParams.apiTimeout ?? 0,
+    model: context.agentParams.model,
+    maxTokens: params.maxTokens ?? context.maxTokensRemaining(),
+    maxToolCalls: params.maxActions ?? context.agentParams.maxActions ?? 10,
+    maxToolCallRetries: params.maxActionRetries ?? context.agentParams.maxActionRetries ?? 3,
     summarize: true,
     debug,
     callTool,
     tools,
-    ...limits,
-    onBeforeTurn: ({ conversation }) => {
-      const userMessage = conversation.messages.find(m => m.role === 'user');
-      page.emit(Page.Events.AgentTurn, { role: 'user', message: userMessage?.content ?? '' });
-      return 'continue';
-    },
-    onAfterTurn: ({ assistantMessage, totalUsage }) => {
-      ++turns;
-      const usage = { inputTokens: totalUsage.input, outputTokens: totalUsage.output };
-      const intent = assistantMessage.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
-      page.emit(Page.Events.AgentTurn, { role: 'assistant', message: intent, usage });
-      if (!assistantMessage.content.filter(c => c.type === 'tool_call').length)
-        page.emit(Page.Events.AgentTurn, { role: 'assistant', message: `no tool calls`, usage });
-      return 'continue';
-    },
-    onBeforeToolCall: ({ toolCall }) => {
-      page.emit(Page.Events.AgentTurn, { role: 'assistant', message: `call tool "${toolCall.name}"` });
-      return 'continue';
-    },
-    onAfterToolCall: ({ toolCall }) => {
-      const suffix = toolCall.result?.isError ? 'failed' : 'succeeded';
-      page.emit(Page.Events.AgentTurn, { role: 'user', message: `tool "${toolCall.name}" ${suffix}` });
-      return 'continue';
-    },
-    onToolCallError: ({ toolCall, error }) => {
-      page.emit(Page.Events.AgentTurn, { role: 'user', message: `tool "${toolCall.name}" failed: ${error.message}` });
-      return 'continue';
-    },
-    ...options
+    secrets,
+    cache: apiCacheBefore,
+    ...context.events,
   });
 
-  const task = `${userTask}
+  const task: string[] = [];
+  if (context.agentParams.systemPrompt) {
+    task.push('### System');
+    task.push(context.agentParams.systemPrompt);
+    task.push('');
+  }
 
-### Page snapshot
-${full}
-`;
+  task.push('### Task');
+  task.push(userTask);
 
-  const { result, usage } = await loop.run(task);
-  return {
-    result,
-    usage: {
-      turns,
-      inputTokens: usage.input,
-      outputTokens: usage.output,
+  if (context.history().length) {
+    task.push('### Context history');
+    task.push(context.history().map(h => `- ${h.type}: ${h.description}`).join('\n'));
+    task.push('');
+  }
+  task.push('### Page snapshot');
+  task.push(full);
+  task.push('');
+
+  const { error, usage } = await loop.run(task.join('\n'), { signal: progress.signal });
+  context.consumeTokens(usage.input + usage.output);
+  if (context.agentParams.apiCacheFile) {
+    const apiCacheAfter = { ...apiCacheBefore, ...loop.cache() };
+    const sortedCache = Object.fromEntries(Object.entries(apiCacheAfter).sort(([a], [b]) => a.localeCompare(b)));
+    const apiCacheTextAfter = JSON.stringify(sortedCache, undefined, 2);
+    if (apiCacheTextAfter !== apiCacheTextBefore) {
+      await fs.promises.mkdir(path.dirname(context.agentParams.apiCacheFile), { recursive: true });
+      await fs.promises.writeFile(context.agentParams.apiCacheFile, apiCacheTextAfter);
     }
-  };
+  }
+
+  if (refusedToPerformReason())
+    throw new Error(`Agent refused to perform action: ${refusedToPerformReason()}`);
+
+  if (error)
+    throw new Error(`Agentic loop failed: ${error}`);
+
+  return { result: reportedResult ? reportedResult() : undefined };
 }
 
-type CachedActions = Record<string, {
-  timestamp: number,
-  actions: actions.Action[],
-}>;
+async function cachedPerform(progress: Progress, context: Context, cacheKey: string): Promise<actions.ActionWithCode[] | undefined> {
+  if (!context.agentParams?.cacheFile)
+    return;
 
-async function cachedPerform(progress: Progress, context: Context, cacheKey: string): Promise<boolean> {
-  if (!context.options?.cacheFile)
-    return false;
-
-  const cache = await cachedActions(context.options?.cacheFile);
+  const cache = await cachedActions(context.agentParams?.cacheFile);
   const entry = cache.actions[cacheKey];
   if (!entry)
-    return false;
+    return;
 
   for (const action of entry.actions)
-    await runAction(progress, 'run', context.page, action, context.options.secrets ?? []);
-  return true;
+    await runAction(progress, 'run', context.page, action, context.agentParams.secrets ?? []);
+  return entry.actions;
 }
 
 async function updateCache(context: Context, cacheKey: string) {
-  const cacheFile = context.options?.cacheFile;
-  const cacheOutFile = context.options?.cacheOutFile;
+  const cacheFile = context.agentParams?.cacheFile;
+  const cacheOutFile = context.agentParams?.cacheOutFile;
+  const cacheFileKey = cacheFile ?? cacheOutFile;
 
-  const cache = cacheFile ? await cachedActions(cacheFile) : { actions: {}, newActions: {} };
-  const newEntry = {
-    timestamp: Date.now(),
-    actions: context.actions,
-  };
+  const cache = cacheFileKey ? await cachedActions(cacheFileKey) : { actions: {}, newActions: {} };
+  const newEntry = { actions: context.actions() };
   cache.actions[cacheKey] = newEntry;
   cache.newActions[cacheKey] = newEntry;
 
@@ -212,8 +196,8 @@ async function updateCache(context: Context, cacheKey: string) {
 }
 
 type Cache = {
-  actions: CachedActions;
-  newActions: CachedActions;
+  actions: actions.CachedActions;
+  newActions: actions.CachedActions;
 };
 
 const allCaches = new Map<string, Cache>();
@@ -221,8 +205,11 @@ const allCaches = new Map<string, Cache>();
 async function cachedActions(cacheFile: string): Promise<Cache> {
   let cache = allCaches.get(cacheFile);
   if (!cache) {
-    const actions = await fs.promises.readFile(cacheFile, 'utf-8').then(text => JSON.parse(text)).catch(() => ({})) as CachedActions;
-    cache = { actions, newActions: {} };
+    const json = await fs.promises.readFile(cacheFile, 'utf-8').then(text => JSON.parse(text)).catch(() => ({}));
+    const parsed = actions.cachedActionsSchema.safeParse(json);
+    if (parsed.error)
+      throw new Error(`Failed to parse cache file ${cacheFile}:\n${zod.prettifyError(parsed.error)}`);
+    cache = { actions: parsed.data, newActions: {} };
     allCaches.set(cacheFile, cache);
   }
   return cache;

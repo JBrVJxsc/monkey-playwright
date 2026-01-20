@@ -22,6 +22,7 @@ import { colors, ProgramOption } from 'playwright-core/lib/utilsBundle';
 import { registry } from 'playwright-core/lib/server';
 
 import * as mcpServer from './sdk/server';
+import { startMcpDaemonServer } from './terminal/daemon';
 import { commaSeparatedList, dotenvFileLoader, enumParser, headerParser, numberParser, resolutionParser, resolveCLIConfig, semicolonSeparatedList } from './browser/config';
 import { setupExitWatchdog } from './browser/watchdog';
 import { contextFactory } from './browser/browserContextFactory';
@@ -72,7 +73,9 @@ export function decorateCommand(command: Command, version: string) {
       .option('--user-agent <ua string>', 'specify user agent string')
       .option('--user-data-dir <path>', 'path to the user data directory. If not specified, a temporary directory will be created.')
       .option('--viewport-size <size>', 'specify browser viewport size in pixels, for example "1280x720"', resolutionParser.bind(null, '--viewport-size'))
+      .option('--codegen <lang>', 'specify the language to use for code generation, possible values: "typescript", "none". Default is "typescript".', enumParser.bind(null, '--codegen', ['none', 'typescript']))
       .addOption(new ProgramOption('--vision', 'Legacy option, use --caps=vision instead').hideHelp())
+      .addOption(new ProgramOption('--daemon <socket>', 'run as daemon').hideHelp())
       .action(async options => {
         setupExitWatchdog();
 
@@ -103,6 +106,20 @@ export function decorateCommand(command: Command, version: string) {
             create: () => new BrowserServerBackend(config, extensionContextFactory)
           };
           await mcpServer.start(serverBackendFactory, config.server);
+          return;
+        }
+
+        if (options.daemon) {
+          config.snapshot.mode = 'none';
+          config.codegen = 'none';
+          const serverBackendFactory: mcpServer.ServerBackendFactory = {
+            name: 'Playwright',
+            nameInConfig: 'playwright-daemon',
+            version,
+            create: () => new BrowserServerBackend(config, browserContextFactory)
+          };
+          const socketPath = await startMcpDaemonServer(options.daemon, serverBackendFactory);
+          console.error(`Daemon server listening on ${socketPath}`);
           return;
         }
 

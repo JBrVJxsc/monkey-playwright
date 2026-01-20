@@ -26,6 +26,7 @@ export interface Channel {
 
 // ----------- Initializer Traits -----------
 export type InitializerTraits<T> =
+    T extends PageAgentChannel ? PageAgentInitializer :
     T extends JsonPipeChannel ? JsonPipeInitializer :
     T extends AndroidDeviceChannel ? AndroidDeviceInitializer :
     T extends AndroidSocketChannel ? AndroidSocketInitializer :
@@ -63,6 +64,7 @@ export type InitializerTraits<T> =
 
 // ----------- Event Traits -----------
 export type EventsTraits<T> =
+    T extends PageAgentChannel ? PageAgentEvents :
     T extends JsonPipeChannel ? JsonPipeEvents :
     T extends AndroidDeviceChannel ? AndroidDeviceEvents :
     T extends AndroidSocketChannel ? AndroidSocketEvents :
@@ -100,6 +102,7 @@ export type EventsTraits<T> =
 
 // ----------- EventTarget Traits -----------
 export type EventTargetTraits<T> =
+    T extends PageAgentChannel ? PageAgentEventTarget :
     T extends JsonPipeChannel ? JsonPipeEventTarget :
     T extends AndroidDeviceChannel ? AndroidDeviceEventTarget :
     T extends AndroidSocketChannel ? AndroidSocketEventTarget :
@@ -1008,15 +1011,6 @@ export type BrowserTypeLaunchPersistentContextParams = {
   serviceWorkers?: 'allow' | 'block',
   selectorEngines?: SelectorEngine[],
   testIdAttributeName?: string,
-  agent?: {
-    provider?: string,
-    model?: string,
-    cacheFile?: string,
-    cacheOutFile?: string,
-    secrets?: NameValue[],
-    maxTurns?: number,
-    maxTokens?: number,
-  },
   userDataDir: string,
   slowMo?: number,
 };
@@ -1099,15 +1093,6 @@ export type BrowserTypeLaunchPersistentContextOptions = {
   serviceWorkers?: 'allow' | 'block',
   selectorEngines?: SelectorEngine[],
   testIdAttributeName?: string,
-  agent?: {
-    provider?: string,
-    model?: string,
-    cacheFile?: string,
-    cacheOutFile?: string,
-    secrets?: NameValue[],
-    maxTurns?: number,
-    maxTokens?: number,
-  },
   slowMo?: number,
 };
 export type BrowserTypeLaunchPersistentContextResult = {
@@ -1231,15 +1216,6 @@ export type BrowserNewContextParams = {
   serviceWorkers?: 'allow' | 'block',
   selectorEngines?: SelectorEngine[],
   testIdAttributeName?: string,
-  agent?: {
-    provider?: string,
-    model?: string,
-    cacheFile?: string,
-    cacheOutFile?: string,
-    secrets?: NameValue[],
-    maxTurns?: number,
-    maxTokens?: number,
-  },
   proxy?: {
     server: string,
     bypass?: string,
@@ -1308,15 +1284,6 @@ export type BrowserNewContextOptions = {
   serviceWorkers?: 'allow' | 'block',
   selectorEngines?: SelectorEngine[],
   testIdAttributeName?: string,
-  agent?: {
-    provider?: string,
-    model?: string,
-    cacheFile?: string,
-    cacheOutFile?: string,
-    secrets?: NameValue[],
-    maxTurns?: number,
-    maxTokens?: number,
-  },
   proxy?: {
     server: string,
     bypass?: string,
@@ -1388,15 +1355,6 @@ export type BrowserNewContextForReuseParams = {
   serviceWorkers?: 'allow' | 'block',
   selectorEngines?: SelectorEngine[],
   testIdAttributeName?: string,
-  agent?: {
-    provider?: string,
-    model?: string,
-    cacheFile?: string,
-    cacheOutFile?: string,
-    secrets?: NameValue[],
-    maxTurns?: number,
-    maxTokens?: number,
-  },
   proxy?: {
     server: string,
     bypass?: string,
@@ -1465,15 +1423,6 @@ export type BrowserNewContextForReuseOptions = {
   serviceWorkers?: 'allow' | 'block',
   selectorEngines?: SelectorEngine[],
   testIdAttributeName?: string,
-  agent?: {
-    provider?: string,
-    model?: string,
-    cacheFile?: string,
-    cacheOutFile?: string,
-    secrets?: NameValue[],
-    maxTurns?: number,
-    maxTokens?: number,
-  },
   proxy?: {
     server: string,
     bypass?: string,
@@ -1609,15 +1558,6 @@ export type BrowserContextInitializer = {
     serviceWorkers?: 'allow' | 'block',
     selectorEngines?: SelectorEngine[],
     testIdAttributeName?: string,
-    agent?: {
-      provider?: string,
-      model?: string,
-      cacheFile?: string,
-      cacheOutFile?: string,
-      secrets?: NameValue[],
-      maxTurns?: number,
-      maxTokens?: number,
-    },
   },
 };
 export interface BrowserContextEventTarget {
@@ -1660,6 +1600,7 @@ export interface BrowserContextChannel extends BrowserContextEventTarget, EventT
   pause(params?: BrowserContextPauseParams, progress?: Progress): Promise<BrowserContextPauseResult>;
   enableRecorder(params: BrowserContextEnableRecorderParams, progress?: Progress): Promise<BrowserContextEnableRecorderResult>;
   disableRecorder(params?: BrowserContextDisableRecorderParams, progress?: Progress): Promise<BrowserContextDisableRecorderResult>;
+  exposeConsoleApi(params?: BrowserContextExposeConsoleApiParams, progress?: Progress): Promise<BrowserContextExposeConsoleApiResult>;
   newCDPSession(params: BrowserContextNewCDPSessionParams, progress?: Progress): Promise<BrowserContextNewCDPSessionResult>;
   harStart(params: BrowserContextHarStartParams, progress?: Progress): Promise<BrowserContextHarStartResult>;
   harExport(params: BrowserContextHarExportParams, progress?: Progress): Promise<BrowserContextHarExportResult>;
@@ -1939,6 +1880,9 @@ export type BrowserContextEnableRecorderResult = void;
 export type BrowserContextDisableRecorderParams = {};
 export type BrowserContextDisableRecorderOptions = {};
 export type BrowserContextDisableRecorderResult = void;
+export type BrowserContextExposeConsoleApiParams = {};
+export type BrowserContextExposeConsoleApiOptions = {};
+export type BrowserContextExposeConsoleApiResult = void;
 export type BrowserContextNewCDPSessionParams = {
   page?: PageChannel,
   frame?: FrameChannel,
@@ -2078,7 +2022,6 @@ export type PageInitializer = {
   opener?: PageChannel,
 };
 export interface PageEventTarget {
-  on(event: 'agentTurn', callback: (params: PageAgentTurnEvent) => void): this;
   on(event: 'bindingCall', callback: (params: PageBindingCallEvent) => void): this;
   on(event: 'close', callback: (params: PageCloseEvent) => void): this;
   on(event: 'crash', callback: (params: PageCrashEvent) => void): this;
@@ -2135,18 +2078,8 @@ export interface PageChannel extends PageEventTarget, EventTargetChannel {
   stopCSSCoverage(params?: PageStopCSSCoverageParams, progress?: Progress): Promise<PageStopCSSCoverageResult>;
   bringToFront(params?: PageBringToFrontParams, progress?: Progress): Promise<PageBringToFrontResult>;
   updateSubscription(params: PageUpdateSubscriptionParams, progress?: Progress): Promise<PageUpdateSubscriptionResult>;
-  agentPerform(params: PageAgentPerformParams, progress?: Progress): Promise<PageAgentPerformResult>;
-  agentExpect(params: PageAgentExpectParams, progress?: Progress): Promise<PageAgentExpectResult>;
-  agentExtract(params: PageAgentExtractParams, progress?: Progress): Promise<PageAgentExtractResult>;
+  agent(params: PageAgentParams, progress?: Progress): Promise<PageAgentResult>;
 }
-export type PageAgentTurnEvent = {
-  role: string,
-  message: string,
-  usage?: {
-    inputTokens: number,
-    outputTokens: number,
-  },
-};
 export type PageBindingCallEvent = {
   binding: BindingCallChannel,
 };
@@ -2649,55 +2582,41 @@ export type PageUpdateSubscriptionOptions = {
 
 };
 export type PageUpdateSubscriptionResult = void;
-export type PageAgentPerformParams = {
-  task: string,
-  key?: string,
-  maxTurns?: number,
+export type PageAgentParams = {
+  api?: string,
+  apiKey?: string,
+  apiEndpoint?: string,
+  apiTimeout?: number,
+  apiCacheFile?: string,
+  cacheFile?: string,
+  cacheOutFile?: string,
+  maxActions?: number,
+  maxActionRetries?: number,
   maxTokens?: number,
+  model?: string,
+  secrets?: NameValue[],
+  systemPrompt?: string,
 };
-export type PageAgentPerformOptions = {
-  key?: string,
-  maxTurns?: number,
+export type PageAgentOptions = {
+  api?: string,
+  apiKey?: string,
+  apiEndpoint?: string,
+  apiTimeout?: number,
+  apiCacheFile?: string,
+  cacheFile?: string,
+  cacheOutFile?: string,
+  maxActions?: number,
+  maxActionRetries?: number,
   maxTokens?: number,
+  model?: string,
+  secrets?: NameValue[],
+  systemPrompt?: string,
 };
-export type PageAgentPerformResult = {
-  turns: number,
-  inputTokens: number,
-  outputTokens: number,
-};
-export type PageAgentExpectParams = {
-  expectation: string,
-  key?: string,
-  maxTurns?: number,
-  maxTokens?: number,
-};
-export type PageAgentExpectOptions = {
-  key?: string,
-  maxTurns?: number,
-  maxTokens?: number,
-};
-export type PageAgentExpectResult = void;
-export type PageAgentExtractParams = {
-  query: string,
-  schema: any,
-  key?: string,
-  maxTurns?: number,
-  maxTokens?: number,
-};
-export type PageAgentExtractOptions = {
-  key?: string,
-  maxTurns?: number,
-  maxTokens?: number,
-};
-export type PageAgentExtractResult = {
-  result: any,
-  turns: number,
-  inputTokens: number,
-  outputTokens: number,
+export type PageAgentResult = {
+  agent: PageAgentChannel,
 };
 
 export interface PageEvents {
-  'agentTurn': PageAgentTurnEvent;
   'bindingCall': PageBindingCallEvent;
   'close': PageCloseEvent;
   'crash': PageCrashEvent;
@@ -4960,15 +4879,6 @@ export type AndroidDeviceLaunchBrowserParams = {
   serviceWorkers?: 'allow' | 'block',
   selectorEngines?: SelectorEngine[],
   testIdAttributeName?: string,
-  agent?: {
-    provider?: string,
-    model?: string,
-    cacheFile?: string,
-    cacheOutFile?: string,
-    secrets?: NameValue[],
-    maxTurns?: number,
-    maxTokens?: number,
-  },
   pkg?: string,
   args?: string[],
   proxy?: {
@@ -5035,15 +4945,6 @@ export type AndroidDeviceLaunchBrowserOptions = {
   serviceWorkers?: 'allow' | 'block',
   selectorEngines?: SelectorEngine[],
   testIdAttributeName?: string,
-  agent?: {
-    provider?: string,
-    model?: string,
-    cacheFile?: string,
-    cacheOutFile?: string,
-    secrets?: NameValue[],
-    maxTurns?: number,
-    maxTokens?: number,
-  },
   pkg?: string,
   args?: string[],
   proxy?: {
@@ -5192,4 +5093,102 @@ export interface JsonPipeEvents {
   'message': JsonPipeMessageEvent;
   'closed': JsonPipeClosedEvent;
 }
+
+// ----------- PageAgent -----------
+export type PageAgentInitializer = {
+  page: PageChannel,
+};
+export interface PageAgentEventTarget {
+  on(event: 'turn', callback: (params: PageAgentTurnEvent) => void): this;
+}
+export interface PageAgentChannel extends PageAgentEventTarget, EventTargetChannel {
+  _type_PageAgent: boolean;
+  perform(params: PageAgentPerformParams, progress?: Progress): Promise<PageAgentPerformResult>;
+  expect(params: PageAgentExpectParams, progress?: Progress): Promise<PageAgentExpectResult>;
+  extract(params: PageAgentExtractParams, progress?: Progress): Promise<PageAgentExtractResult>;
+  dispose(params?: PageAgentDisposeParams, progress?: Progress): Promise<PageAgentDisposeResult>;
+  usage(params?: PageAgentUsageParams, progress?: Progress): Promise<PageAgentUsageResult>;
+}
+export type PageAgentTurnEvent = {
+  role: string,
+  message: string,
+  usage?: {
+    inputTokens: number,
+    outputTokens: number,
+  },
+};
+export type PageAgentPerformParams = {
+  task: string,
+  maxActions?: number,
+  maxActionRetries?: number,
+  maxTokens?: number,
+  cacheKey?: string,
+  timeout?: number,
+};
+export type PageAgentPerformOptions = {
+  maxActions?: number,
+  maxActionRetries?: number,
+  maxTokens?: number,
+  cacheKey?: string,
+  timeout?: number,
+};
+export type PageAgentPerformResult = {
+  usage: AgentUsage,
+};
+export type PageAgentExpectParams = {
+  expectation: string,
+  maxActions?: number,
+  maxActionRetries?: number,
+  maxTokens?: number,
+  cacheKey?: string,
+  timeout?: number,
+};
+export type PageAgentExpectOptions = {
+  maxActions?: number,
+  maxActionRetries?: number,
+  maxTokens?: number,
+  cacheKey?: string,
+  timeout?: number,
+};
+export type PageAgentExpectResult = {
+  usage: AgentUsage,
+};
+export type PageAgentExtractParams = {
+  query: string,
+  schema: any,
+  maxActions?: number,
+  maxActionRetries?: number,
+  maxTokens?: number,
+  cacheKey?: string,
+  timeout?: number,
+};
+export type PageAgentExtractOptions = {
+  maxActions?: number,
+  maxActionRetries?: number,
+  maxTokens?: number,
+  cacheKey?: string,
+  timeout?: number,
+};
+export type PageAgentExtractResult = {
+  result: any,
+  usage: AgentUsage,
+};
+export type PageAgentDisposeParams = {};
+export type PageAgentDisposeOptions = {};
+export type PageAgentDisposeResult = void;
+export type PageAgentUsageParams = {};
+export type PageAgentUsageOptions = {};
+export type PageAgentUsageResult = {
+  usage: AgentUsage,
+};
+
+export interface PageAgentEvents {
+  'turn': PageAgentTurnEvent;
+}
+
+export type AgentUsage = {
+  turns: number,
+  inputTokens: number,
+  outputTokens: number,
+};
 

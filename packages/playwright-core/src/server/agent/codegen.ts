@@ -15,16 +15,23 @@
  */
 
 import { asLocator } from '../../utils/isomorphic/locatorGenerators';
-import { escapeTemplateString, escapeWithQuotes, formatObjectOrVoid } from '../../utils/isomorphic/stringUtils';
+import { escapeTemplateString, escapeWithQuotes, formatObjectOrVoid, parseRegex } from '../../utils/isomorphic/stringUtils';
 
 import type * as actions from './actions';
 import type { Language } from '../../utils/isomorphic/locatorGenerators';
 
 export async function generateCode(sdkLanguage: Language, action: actions.Action) {
   switch (action.method) {
+    case 'navigate': {
+      return `await page.goto(${escapeWithQuotes(action.url)});`;
+    }
     case 'click': {
       const locator = asLocator(sdkLanguage, action.selector);
-      return `await page.${locator}.click(${formatObjectOrVoid(action.options)});`;
+      return `await page.${locator}.click(${formatObjectOrVoid({
+        button: action.button,
+        clickCount: action.clickCount,
+        modifiers: action.modifiers,
+      })});`;
     }
     case 'drag': {
       const sourceLocator = asLocator(sdkLanguage, action.sourceSelector);
@@ -33,7 +40,9 @@ export async function generateCode(sdkLanguage: Language, action: actions.Action
     }
     case 'hover': {
       const locator = asLocator(sdkLanguage, action.selector);
-      return `await page.${locator}.hover(${formatObjectOrVoid(action.options)});`;
+      return `await page.${locator}.hover(${formatObjectOrVoid({
+        modifiers: action.modifiers,
+      })});`;
     }
     case 'pressKey': {
       return `await page.keyboard.press(${escapeWithQuotes(action.key, '\'')});`;
@@ -65,16 +74,28 @@ export async function generateCode(sdkLanguage: Language, action: actions.Action
     }
     case 'expectVisible': {
       const locator = asLocator(sdkLanguage, action.selector);
-      return `await expect(page.${locator}).toBeVisible();`;
+      const notInfix = action.isNot ? 'not.' : '';
+      return `await expect(page.${locator}).${notInfix}toBeVisible();`;
     }
     case 'expectValue': {
+      const notInfix = action.isNot ? 'not.' : '';
       const locator = asLocator(sdkLanguage, action.selector);
       if (action.type === 'checkbox' || action.type === 'radio')
-        return `await expect(page.${locator}).toBeChecked({ checked: ${action.value === 'true'} });`;
-      return `await expect(page.${locator}).toHaveValue(${escapeWithQuotes(action.value)});`;
+        return `await expect(page.${locator}).${notInfix}toBeChecked({ checked: ${action.value === 'true'} });`;
+      return `await expect(page.${locator}).${notInfix}toHaveValue(${escapeWithQuotes(action.value)});`;
     }
     case 'expectAria': {
-      return `await expect(page.locator('body')).toMatchAria(\`\n${escapeTemplateString(action.template)}\n\`);`;
+      const notInfix = action.isNot ? 'not.' : '';
+      return `await expect(page.locator('body')).${notInfix}toMatchAria(\`\n${escapeTemplateString(action.template)}\n\`);`;
+    }
+    case 'expectURL': {
+      const arg = action.regex ? parseRegex(action.regex).toString() : escapeWithQuotes(action.value!);
+      const notInfix = action.isNot ? 'not.' : '';
+      return `await expect(page).${notInfix}toHaveURL(${arg});`;
+    }
+    case 'expectTitle': {
+      const notInfix = action.isNot ? 'not.' : '';
+      return `await expect(page).${notInfix}toHaveTitle(${escapeWithQuotes(action.value)});`;
     }
   }
   // @ts-expect-error

@@ -193,20 +193,24 @@ export class SnapshotRenderer {
     let result = sameFrameResource ?? otherFrameResource;
     if (result && method.toUpperCase() === 'GET') {
       // Patch override if necessary.
-      for (const o of snapshot.resourceOverrides) {
-        if (url === o.url && o.sha1) {
-          result = {
-            ...result,
-            response: {
-              ...result.response,
-              content: {
-                ...result.response.content,
-                _sha1: o.sha1,
-              }
-            },
-          };
-          break;
-        }
+      let override = snapshot.resourceOverrides.find(o => o.url === url);
+      if (override?.ref) {
+        // "ref" means use the same content as "ref" snapshots ago.
+        const index = this._index - override.ref;
+        if (index >= 0 && index < this._snapshots.length)
+          override = this._snapshots[index].resourceOverrides.find(o => o.url === url);
+      }
+      if (override?.sha1) {
+        result = {
+          ...result,
+          response: {
+            ...result.response,
+            content: {
+              ...result.response.content,
+              _sha1: override.sha1,
+            }
+          },
+        };
       }
     }
 
@@ -400,7 +404,7 @@ function snapshotScript(viewport: ViewportSize, ...targetIds: (string | undefine
         element.scrollLeft = +element.getAttribute('__playwright_scroll_left_')!;
         element.removeAttribute('__playwright_scroll_left_');
         if (frameBoundingRectsInfo.frames.has(element))
-          frameBoundingRectsInfo.frames.get(element)!.scrollLeft = element.scrollTop;
+          frameBoundingRectsInfo.frames.get(element)!.scrollLeft = element.scrollLeft;
       }
 
       win.document.styleSheets[0].disabled = true;

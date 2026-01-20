@@ -225,11 +225,11 @@ export class Tab extends EventEmitter<TabEventsInterface> {
     return this._requests;
   }
 
-  async captureSnapshot(): Promise<TabSnapshot> {
+  async captureSnapshot(includePageSnapshot: boolean): Promise<TabSnapshot> {
     await this._initializedPromise;
     let tabSnapshot: TabSnapshot | undefined;
     const modalStates = await this._raceAgainstModalStates(async () => {
-      const snapshot = await this.page._snapshotForAI({ track: 'response' });
+      const snapshot = includePageSnapshot ? await this.page._snapshotForAI({ track: 'response' }) : { full: '', incremental: '' };
       tabSnapshot = {
         url: this.page.url(),
         title: await this.page.title(),
@@ -284,16 +284,18 @@ export class Tab extends EventEmitter<TabEventsInterface> {
     await this._raceAgainstModalStates(() => waitForCompletion(this, callback));
   }
 
-  async refLocator(params: { element: string, ref: string }): Promise<{ locator: Locator, resolved: string }> {
+  async refLocator(params: { element?: string, ref: string }): Promise<{ locator: Locator, resolved: string }> {
     await this._initializedPromise;
     return (await this.refLocators([params]))[0];
   }
 
-  async refLocators(params: { element: string, ref: string }[]): Promise<{ locator: Locator, resolved: string }[]> {
+  async refLocators(params: { element?: string, ref: string }[]): Promise<{ locator: Locator, resolved: string }[]> {
     await this._initializedPromise;
     return Promise.all(params.map(async param => {
       try {
-        const locator = this.page.locator(`aria-ref=${param.ref}`).describe(param.element) as Locator;
+        let locator = this.page.locator(`aria-ref=${param.ref}`);
+        if (param.element)
+          locator = locator.describe(param.element);
         const { resolvedSelector } = await locator._resolveSelector();
         return { locator, resolved: asLocator('javascript', resolvedSelector) };
       } catch (e) {

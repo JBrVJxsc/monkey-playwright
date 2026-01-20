@@ -370,21 +370,9 @@ It makes the execution of the tests non-deterministic.
 Emulates consistent window screen size available inside web page via `window.screen`. Is only used when the
 [`option: viewport`] is set.
 
-## context-option-agent
-- `agent` <[Object]>
-  - `provider` ?<[string]> LLM provider to use. Required in non-cache mode.
-  - `model` ?<[string]> Model identifier within the provider. Required in non-cache mode.
-  - `cacheFile` ?<[string]> Cache file to use/generate code for performed actions into. Cache is not used if not specified (default).
-  - `cacheOutFile` ?<[string]> When specified, generated entries are written into the `cacheOutFile` instead of updating the `cacheFile`.
-  - `secrets` ?<[Object]<[string], [string]>> Secrets to hide from the LLM.
-  - `maxTurns` ?<[int]> Maximum number of agentic turns to take per call. Defaults to 10.
-  - `maxTokens` ?<[int]> Maximum number of tokens to consume per call. The agentic loop will stop after input + output tokens exceed this value. Defaults on unlimited.
-
-Agent settings for [`property: Page.agent`].
-
-## page-agent-key
+## page-agent-cache-key
 * since: v1.58
-- `key` <[string]>
+- `cacheKey` <[string]>
 
 All the agentic actions are converted to the Playwright calls and are cached.
 By default, they are cached globally with the `task` as a key. This option allows controlling the cache key explicitly.
@@ -396,16 +384,30 @@ By default, they are cached globally with the `task` as a key. This option allow
 Maximum number of tokens to consume. The agentic loop will stop after input + output tokens exceed this value.
 Defaults to context-wide value specified in `agent` property.
 
-## page-agent-max-turns
+## page-agent-max-actions
 * since: v1.58
-- `maxTurns` <[int]>
+- `maxActions` <[int]>
 
-Maximum number of agentic turns during this call, defaults to context-wide value specified in `agent` property.
+Maximum number of agentic actions to generate, defaults to context-wide value specified in `agent` property.
+
+## page-agent-max-action-retries
+* since: v1.58
+- `maxActionRetries` <[int]>
+
+Maximum number of retries when generating each action, defaults to context-wide value specified in `agent` property.
+
+## page-agent-timeout
+* since: v1.58
+- `timeout` <[int]>
+
+Request timeout in milliseconds. Defaults to action timeout. Pass `0` to disable timeout.
 
 ## page-agent-call-options-v1.58
-- %%-page-agent-key-%%
+- %%-page-agent-cache-key-%%
 - %%-page-agent-max-tokens-%%
-- %%-page-agent-max-turns-%%
+- %%-page-agent-max-actions-%%
+- %%-page-agent-max-action-retries-%%
+- %%-page-agent-timeout-%%
 
 ## fetch-param-url
 - `url` <[string]>

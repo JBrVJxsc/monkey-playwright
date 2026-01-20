@@ -27,7 +27,7 @@ import { RouteDispatcher, WebSocketDispatcher } from './networkDispatchers';
 import { WebSocketRouteDispatcher } from './webSocketRouteDispatcher';
 import { SdkObject } from '../instrumentation';
 import { urlMatches } from '../../utils/isomorphic/urlMatch';
-import { pageAgentPerform, pageAgentExpect, pageAgentExtract } from '../agent/pageAgent';
+import { PageAgentDispatcher } from './pageAgentDispatcher';
 
 import type { Artifact } from '../artifact';
 import type { BrowserContext } from '../browserContext';
@@ -94,7 +94,6 @@ export class PageDispatcher extends Dispatcher<Page, channels.PageChannel, Brows
       this._dispatchEvent('route', { route: new RouteDispatcher(RequestDispatcher.from(this.parentScope(), request), route) });
     };
 
-    this.addObjectListener(Page.Events.AgentTurn, params => this._dispatchEvent('agentTurn', params));
     this.addObjectListener(Page.Events.Close, () => {
       this._dispatchEvent('close');
       this._dispose();
@@ -322,19 +321,6 @@ export class PageDispatcher extends Dispatcher<Page, channels.PageChannel, Brows
     return { pdf: buffer };
   }
 
-  async agentPerform(params: channels.PageAgentPerformParams, progress: Progress): Promise<channels.PageAgentPerformResult> {
-    return await pageAgentPerform(progress, this._page, params);
-  }
-
-  async agentExpect(params: channels.PageAgentExpectParams, progress: Progress): Promise<channels.PageAgentExpectResult> {
-    await pageAgentExpect(progress, this._page, params);
-  }
-
-  async agentExtract(params: channels.PageAgentExtractParams, progress: Progress): Promise<channels.PageAgentExtractResult> {
-    const { result, usage } = await pageAgentExtract(progress, this._page, params);
-    return { result, ...usage };
-  }
-
   async requests(params: channels.PageRequestsParams, progress: Progress): Promise<channels.PageRequestsResult> {
     // Send all future requests to the client, so that it can reliably receive all of them.
     // Otherwise, if subscription is added in a different task from this call (either before or after),
@@ -373,6 +359,10 @@ export class PageDispatcher extends Dispatcher<Page, channels.PageChannel, Brows
     this._cssCoverageActive = false;
     const coverage = this._page.coverage as CRCoverage;
     return await coverage.stopCSSCoverage();
+  }
+
+  async agent(params: channels.PageAgentParams, progress: Progress): Promise<channels.PageAgentResult> {
+    return { agent: new PageAgentDispatcher(this, params) };
   }
 
   _onFrameAttached(frame: Frame) {
