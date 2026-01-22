@@ -226,7 +226,10 @@ export class Recorder extends EventEmitter<RecorderEventMap> implements Instrume
           (source: BindingSource, action: actions.Action) => this._recordAction(source.frame, action));
 
       const recorderScript = this._params.customRecorderScript || rawRecorderSource.source;
-      await this._context.extendInjectedScript(recorderScript, { recorderMode: this._recorderMode });
+      await this._context.extendInjectedScript(recorderScript, {
+        recorderMode: this._recorderMode,
+        customHighlightCSS: this._params.customHighlightCSS,
+      });
     });
 
     if (this._debugger.isPaused())

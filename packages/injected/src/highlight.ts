@@ -51,7 +51,7 @@ export class Highlight {
   private _rafRequest: number | undefined;
   private _language: Language = 'javascript';
 
-  constructor(injectedScript: InjectedScript) {
+  constructor(injectedScript: InjectedScript, customCSS?: string) {
     this._injectedScript = injectedScript;
     const document = injectedScript.document;
     this._isUnderTest = injectedScript.isUnderTest;
@@ -68,15 +68,17 @@ export class Highlight {
     this._actionPointElement = document.createElement('x-pw-action-point');
     this._actionPointElement.setAttribute('hidden', 'true');
     this._glassPaneShadow = this._glassPaneElement.attachShadow({ mode: this._isUnderTest ? 'open' : 'closed' });
+    // Use custom CSS if provided, otherwise use default highlightCSS
+    const css = customCSS || highlightCSS;
     // workaround for firefox: when taking screenshots, it complains adoptedStyleSheets.push
     // is not a function, so we fallback to style injection
     if (typeof this._glassPaneShadow.adoptedStyleSheets.push === 'function') {
       const sheet = new this._injectedScript.window.CSSStyleSheet();
-      sheet.replaceSync(highlightCSS);
+      sheet.replaceSync(css);
       this._glassPaneShadow.adoptedStyleSheets.push(sheet);
     } else {
       const styleElement = this._injectedScript.document.createElement('style');
-      styleElement.textContent = highlightCSS;
+      styleElement.textContent = css;
       this._glassPaneShadow.appendChild(styleElement);
     }
     this._glassPaneShadow.appendChild(this._actionPointElement);
@@ -274,5 +276,23 @@ export class Highlight {
     this._glassPaneElement.style.pointerEvents = 'none';
     this._glassPaneElement.style.backgroundColor = 'transparent';
     this._glassPaneElement.removeEventListener('click', handler);
+  }
+
+  /**
+   * Inject a stylesheet into the shadow DOM.
+   * Used by custom recorder scripts to inject their own styles (e.g., Tailwind CSS themes).
+   * @param css - The CSS content to inject
+   * @param id - A unique identifier to prevent duplicate injections
+   */
+  injectStylesheet(css: string, id: string) {
+    // Check if stylesheet with this ID already exists
+    const existingStyle = this._glassPaneShadow.getElementById(id);
+    if (existingStyle)
+      return;
+
+    const styleElement = this._injectedScript.document.createElement('style');
+    styleElement.id = id;
+    styleElement.textContent = css;
+    this._glassPaneShadow.appendChild(styleElement);
   }
 }
