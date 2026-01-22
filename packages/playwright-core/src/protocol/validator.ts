@@ -1066,6 +1066,7 @@ scheme.BrowserContextEnableRecorderParams = tObject({
   outputFile: tOptional(tString),
   handleSIGINT: tOptional(tBoolean),
   omitCallTracking: tOptional(tBoolean),
+  customRecorderScript: tOptional(tString),
 });
 scheme.BrowserContextEnableRecorderResult = tOptional(tObject({}));
 scheme.BrowserContextDisableRecorderParams = tOptional(tObject({}));
