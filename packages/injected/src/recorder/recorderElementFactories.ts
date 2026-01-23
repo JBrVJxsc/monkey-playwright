@@ -190,6 +190,31 @@ export interface ElementFactories {
 
   /** Creates a separator line in menus/lists */
   createSeparator(doc: Document): HTMLElement;
+
+  // ============================================
+  // Extended dialog elements (for custom themes)
+  // ============================================
+
+  /** Creates dialog header section */
+  createDialogHeader(doc: Document): HTMLElement;
+
+  /**
+   * Creates dialog title element.
+   * @param doc - Document to create element in
+   * @param text - Title text content
+   */
+  createDialogTitle(doc: Document, text: string): HTMLElement;
+
+  /** Creates dialog footer section for action buttons */
+  createDialogFooter(doc: Document): HTMLElement;
+
+  /**
+   * Creates a button element.
+   * @param doc - Document to create element in
+   * @param text - Button text content
+   * @param variant - Optional variant class (e.g., 'outline', 'primary')
+   */
+  createButton(doc: Document, text: string, variant?: string): HTMLElement;
 }
 
 /**
@@ -303,6 +328,22 @@ const defaultElementFactories: ElementFactories = {
     return el;
   },
   createSeparator: (doc: Document) => doc.createElement('x-pw-separator'),
+
+  // ---- Extended dialog elements ----
+  createDialogHeader: (doc: Document) => doc.createElement('x-pw-dialog-header'),
+  createDialogTitle: (doc: Document, text: string) => {
+    const el = doc.createElement('x-pw-dialog-title');
+    el.textContent = text;
+    return el;
+  },
+  createDialogFooter: (doc: Document) => doc.createElement('x-pw-dialog-footer'),
+  createButton: (doc: Document, text: string, variant?: string) => {
+    const el = doc.createElement('x-pw-button');
+    el.textContent = text;
+    if (variant)
+      el.classList.add(variant);
+    return el;
+  },
 };
 
 // ============================================================================

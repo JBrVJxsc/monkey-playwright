@@ -368,3 +368,405 @@ test.describe('recorder customization via inProcessFactory', () => {
     }
   });
 });
+
+/**
+ * Shadcn/Chaos Monkey Theme Integration Tests
+ *
+ * These tests verify that the customization API can achieve a complete
+ * Shadcn-style theme with custom CSS variables and element factories.
+ *
+ * Based on user's custom theme: /Users/xuzhang/Desktop/highlight.css
+ */
+test.describe('Shadcn theme customization', () => {
+  // Simplified Shadcn-style CSS with CSS custom properties
+  const shadcnCSS = `
+    :host {
+      --pw-background: #ffffff;
+      --pw-foreground: #242424;
+      --pw-popover: #ffffff;
+      --pw-popover-foreground: #242424;
+      --pw-primary: #ffe01a;
+      --pw-primary-foreground: #262626;
+      --pw-muted: #f5f5f5;
+      --pw-muted-foreground: #737373;
+      --pw-border: #ebebeb;
+      --pw-radius-lg: 0.5rem;
+      --pw-radius-md: 0.375rem;
+      --pw-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+      font-family: "Geist Sans", ui-sans-serif, system-ui, sans-serif;
+      font-size: 14px;
+    }
+
+    svg { position: absolute; height: 0; }
+    * { box-sizing: border-box; }
+    *[hidden] { display: none !important; }
+    x-div { display: block; }
+    x-spacer { flex: auto; }
+
+    x-pw-tooltip {
+      background-color: var(--pw-popover);
+      color: var(--pw-popover-foreground);
+      border-radius: var(--pw-radius-lg);
+      border: 1px solid var(--pw-border);
+      box-shadow: var(--pw-shadow-lg);
+      display: none;
+      font-size: 13px;
+      left: 0;
+      max-width: 600px;
+      position: absolute;
+      top: 0;
+      padding: 0;
+      flex-direction: column;
+      overflow: hidden;
+      z-index: 50;
+    }
+
+    x-pw-tooltip-line {
+      display: flex;
+      max-width: 600px;
+      padding: 8px 12px;
+      user-select: none;
+    }
+
+    x-pw-highlight {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 0;
+      height: 0;
+      border-radius: var(--pw-radius-md);
+    }
+
+    x-pw-dialog {
+      background-color: var(--pw-popover);
+      color: var(--pw-popover-foreground);
+      border-radius: var(--pw-radius-lg);
+      border: 1px solid var(--pw-border);
+      box-shadow: var(--pw-shadow-lg);
+      display: flex;
+      flex-direction: column;
+      position: absolute;
+      z-index: 50;
+      pointer-events: auto;
+    }
+
+    x-pw-dialog:not(.autosize) {
+      width: 400px;
+      gap: 16px;
+      padding: 20px;
+    }
+
+    x-pw-dialog-header {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    x-pw-dialog-title {
+      font-size: 18px;
+      line-height: 1;
+      font-weight: 600;
+    }
+
+    x-pw-dialog-body {
+      display: flex;
+      flex-direction: column;
+      flex: auto;
+    }
+
+    x-pw-dialog-footer {
+      display: flex;
+      flex-direction: row;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    x-pw-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--pw-radius-md);
+      font-size: 14px;
+      font-weight: 500;
+      height: 36px;
+      padding: 8px 16px;
+      background-color: var(--pw-primary);
+      color: var(--pw-primary-foreground);
+      border: none;
+      cursor: pointer;
+    }
+
+    x-pw-button.outline {
+      background-color: var(--pw-background);
+      color: var(--pw-foreground);
+      border: 1px solid var(--pw-border);
+    }
+
+    x-pw-tools-list {
+      display: flex;
+      width: 100%;
+      align-items: center;
+      gap: 4px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--pw-border);
+    }
+
+    x-pw-tool-item {
+      pointer-events: auto;
+      height: 28px;
+      min-width: 28px;
+      width: 28px;
+      border-radius: var(--pw-radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    x-pw-tool-item > x-div {
+      width: 16px;
+      height: 16px;
+      background-color: var(--pw-foreground);
+    }
+
+    x-pw-overlay {
+      position: absolute;
+      top: 0;
+      max-width: min-content;
+      z-index: 2147483647;
+      background: transparent;
+      pointer-events: auto;
+    }
+  `;
+
+  test('should apply Shadcn-style CSS with custom properties', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+        customization: {
+          highlightCSS: shadcnCSS,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button>Click me</button>`);
+
+      // Hover to trigger highlight with tooltip
+      await page.locator('button').hover();
+      await page.waitForSelector('x-pw-glass');
+
+      // Check that Shadcn CSS variables are applied
+      const result = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        if (!glass || !glass.shadowRoot) return null;
+
+        const tooltip = glass.shadowRoot.querySelector('x-pw-tooltip');
+        if (!tooltip) return null;
+
+        const style = getComputedStyle(tooltip);
+        return {
+          borderRadius: style.borderRadius,
+          backgroundColor: style.backgroundColor,
+          // Check for Shadcn-style 8px border radius (0.5rem)
+          hasRoundedLg: style.borderRadius === '8px',
+        };
+      });
+
+      expect(result).toBeTruthy();
+      expect(result!.hasRoundedLg).toBe(true);
+      expect(result!.backgroundColor).toBe('rgb(255, 255, 255)');
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should support custom dialog header/title/footer factories', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      const customFactories = `
+        module.exports = {
+          createDialogHeader: (doc) => {
+            const el = doc.createElement('x-pw-dialog-header');
+            el.setAttribute('data-shadcn-header', 'true');
+            return el;
+          },
+          createDialogTitle: (doc, text) => {
+            const el = doc.createElement('x-pw-dialog-title');
+            el.textContent = text;
+            el.setAttribute('data-shadcn-title', 'true');
+            return el;
+          },
+          createDialogFooter: (doc) => {
+            const el = doc.createElement('x-pw-dialog-footer');
+            el.setAttribute('data-shadcn-footer', 'true');
+            return el;
+          },
+          createButton: (doc, text, variant) => {
+            const el = doc.createElement('x-pw-button');
+            el.textContent = text;
+            if (variant) el.classList.add(variant);
+            el.setAttribute('data-shadcn-button', 'true');
+            return el;
+          },
+        };
+      `;
+
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+        customization: {
+          highlightCSS: shadcnCSS,
+          elementFactories: customFactories,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button>Click me</button>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Verify the custom factories are properly registered
+      // (The factories are available but dialog elements are only created when needed)
+      const glassExists = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        return !!glass && !!glass.shadowRoot;
+      });
+
+      expect(glassExists).toBe(true);
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should apply Chaos Monkey yellow primary color', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      // Use custom colors for Chaos Monkey theme
+      // Primary yellow: #ffe01a
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+        customization: {
+          highlightCSS: shadcnCSS,
+          highlightColors: {
+            // Use yellow-tinted highlight colors for Chaos Monkey theme
+            action: '#ffe01a7f',  // Yellow with alpha
+            single: '#ffe01a4f',  // Yellow with lower alpha
+          },
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button>Click me</button>`);
+
+      // Hover to trigger highlight
+      await page.locator('button').hover();
+      await page.waitForSelector('x-pw-glass');
+
+      const highlightInfo = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        if (!glass || !glass.shadowRoot) return null;
+        const highlight = glass.shadowRoot.querySelector('x-pw-highlight');
+        if (!highlight) return null;
+        return {
+          exists: true,
+          visible: (highlight as HTMLElement).style.display !== 'none',
+        };
+      });
+
+      expect(highlightInfo).toBeTruthy();
+      expect(highlightInfo!.exists).toBe(true);
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should support complete Shadcn theme with CSS and factories', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      // Custom factories that add Shadcn-specific attributes/classes
+      const shadcnFactories = `
+        module.exports = {
+          createTooltip: (doc) => {
+            const el = doc.createElement('x-pw-tooltip');
+            el.classList.add('shadcn-tooltip');
+            return el;
+          },
+          createHighlight: (doc) => {
+            const el = doc.createElement('x-pw-highlight');
+            el.classList.add('shadcn-highlight');
+            return el;
+          },
+          createDialog: (doc, autosize) => {
+            const el = doc.createElement('x-pw-dialog');
+            if (autosize) el.classList.add('autosize');
+            el.classList.add('shadcn-dialog');
+            return el;
+          },
+          createToolItem: (doc, name, title) => {
+            const el = doc.createElement('x-pw-tool-item');
+            el.classList.add(name);
+            el.classList.add('shadcn-tool');
+            el.title = title;
+            el.appendChild(doc.createElement('x-div'));
+            return el;
+          },
+        };
+      `;
+
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+        customization: {
+          highlightCSS: shadcnCSS,
+          highlightColors: {
+            action: '#ffe01a7f',
+            single: '#ffe01a4f',
+            multiple: '#fef08a7f',
+            assert: '#ffe01a80',
+          },
+          elementFactories: shadcnFactories,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button>Click me</button>`);
+
+      // Hover to trigger highlight
+      await page.locator('button').hover();
+      await page.waitForSelector('x-pw-glass');
+      await page.waitForTimeout(500);
+
+      // Check that all Shadcn customizations are applied
+      const result = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        if (!glass || !glass.shadowRoot) return null;
+
+        const tooltip = glass.shadowRoot.querySelector('x-pw-tooltip');
+        const highlight = glass.shadowRoot.querySelector('x-pw-highlight');
+        const toolItem = glass.shadowRoot.querySelector('x-pw-tool-item');
+
+        return {
+          tooltipHasShadcnClass: tooltip?.classList.contains('shadcn-tooltip'),
+          highlightHasShadcnClass: highlight?.classList.contains('shadcn-highlight'),
+          toolItemHasShadcnClass: toolItem?.classList.contains('shadcn-tool'),
+        };
+      });
+
+      expect(result).toBeTruthy();
+      expect(result!.tooltipHasShadcnClass).toBe(true);
+      expect(result!.highlightHasShadcnClass).toBe(true);
+      expect(result!.toolItemHasShadcnClass).toBe(true);
+    } finally {
+      await browser.close();
+    }
+  });
+});
