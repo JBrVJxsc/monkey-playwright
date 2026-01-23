@@ -225,7 +225,16 @@ export class Recorder extends EventEmitter<RecorderEventMap> implements Instrume
       await this._context.exposeBinding(progress, '__pw_recorderRecordAction', false,
           (source: BindingSource, action: actions.Action) => this._recordAction(source.frame, action));
 
-      await this._context.extendInjectedScript(rawRecorderSource.source, { recorderMode: this._recorderMode });
+      /**
+       * CUSTOMIZATION: Pass customization options to the injected recorder script.
+       * The customization object (highlightCSS, highlightColors, elementFactories)
+       * is passed to PollingRecorder constructor -> configureRecorder().
+       * See packages/injected/src/recorder/recorderElementFactories.ts for details.
+       */
+      await this._context.extendInjectedScript(rawRecorderSource.source, {
+        recorderMode: this._recorderMode,
+        customization: this._params.customization,
+      });
     });
 
     if (this._debugger.isPaused())

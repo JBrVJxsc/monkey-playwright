@@ -1335,6 +1335,9 @@ BrowserContext:
         outputFile: string?
         handleSIGINT: boolean?
         omitCallTracking: boolean?
+        # CUSTOMIZATION: Custom recorder UI settings (highlightCSS, highlightColors, elementFactories)
+        # See packages/injected/src/recorder/recorderElementFactories.ts for schema
+        customization: json?
 
     disableRecorder:
       internal: true

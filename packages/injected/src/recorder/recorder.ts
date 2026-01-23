@@ -18,6 +18,22 @@
 // See DEPS.list for more details.
 import clipPaths from './clipPaths';
 
+/**
+ * CUSTOMIZATION: Import from recorderElementFactories for UI customization support.
+ *
+ * - getFactories(): Returns element factory functions (custom or default)
+ * - getHighlightColors(): Returns highlight colors (replaces old HighlightColors constant)
+ *
+ * MERGE CONFLICT NOTE: The old `const HighlightColors = {...}` was removed from this file.
+ * If upstream changes colors, update defaultHighlightColors in recorderElementFactories.ts.
+ * If upstream adds new UI elements, add factory to ElementFactories interface.
+ *
+ * Pattern for element creation:
+ *   OLD: document.createElement('x-pw-overlay')
+ *   NEW: getFactories().createOverlay(document)
+ */
+import { getFactories, getHighlightColors } from './recorderElementFactories';
+
 import type { Point } from '@isomorphic/types';
 import type { AriaSnapshot } from '../ariaSnapshot';
 import type { Highlight, HighlightEntry } from '../highlight';
@@ -26,13 +42,6 @@ import type { ElementText } from '../selectorUtils';
 import type * as actions from '@recorder/actions';
 import type { ElementInfo, Mode, OverlayState, UIState } from '@recorder/recorderTypes';
 import type { Language } from '@isomorphic/locatorGenerators';
-
-const HighlightColors = {
-  multiple: '#f6b26b7f',
-  single: '#6fa8dc7f',
-  assert: '#8acae480',
-  action: '#dc6f6f7f',
-};
 
 export interface RecorderDelegate {
   performAction?(action: actions.PerformOnRecordAction): Promise<void>;
@@ -128,7 +137,7 @@ class InspectTool implements RecorderTool {
         selector: generated.selector,
         elements: generated.elements,
         tooltipText: this._recorder.injectedScript.utils.asLocator(this._recorder.state.language, generated.selector),
-        color: this._assertVisibility ? HighlightColors.assert : HighlightColors.single,
+        color: this._assertVisibility ? getHighlightColors().assert : getHighlightColors().single,
       };
     }
 
@@ -568,14 +577,10 @@ class RecordActionTool implements RecorderTool {
       },
     ];
 
-    const listElement = this._recorder.document.createElement('x-pw-action-list');
-    listElement.setAttribute('role', 'list');
-    listElement.setAttribute('aria-label', 'Choose action');
+    const factories = getFactories();
+    const listElement = factories.createActionList(this._recorder.document);
     for (const action of actions) {
-      const actionElement = this._recorder.document.createElement('x-pw-action-item');
-      actionElement.setAttribute('role', 'listitem');
-      actionElement.textContent = action.title;
-      actionElement.setAttribute('aria-label', action.title);
+      const actionElement = factories.createActionItem(this._recorder.document, action.title);
       actionElement.addEventListener('click', () => {
         this._dialog.close();
         action.cb();
@@ -606,7 +611,7 @@ class RecordActionTool implements RecorderTool {
     if (userGesture && activeElement === this._recorder.document.body)
       return;
     const result = activeElement ? this._recorder.injectedScript.generateSelector(activeElement, { testIdAttributeName: this._recorder.state.testIdAttributeName }) : null;
-    this._activeModel = result && result.selector ? { ...result, color: HighlightColors.action } : null;
+    this._activeModel = result && result.selector ? { ...result, color: getHighlightColors().action } : null;
     if (userGesture) {
       this._hoveredElement = activeElement as HTMLElement | null;
       this._updateModelForHoveredElement();
@@ -731,7 +736,7 @@ class RecordActionTool implements RecorderTool {
     const { selector, elements } = this._recorder.injectedScript.generateSelector(this._hoveredElement, { testIdAttributeName: this._recorder.state.testIdAttributeName });
     if (this._hoveredModel && this._hoveredModel.selector === selector)
       return;
-    this._hoveredModel = selector ? { selector, elements, color: HighlightColors.action } : null;
+    this._hoveredModel = selector ? { selector, elements, color: getHighlightColors().action } : null;
     this._updateHighlight(true);
   }
 
@@ -1006,10 +1011,10 @@ class TextAssertionTool implements RecorderTool {
     if (this._hoverHighlight?.elements[0] === target)
       return;
     if (this._kind === 'text' || this._kind === 'snapshot') {
-      this._hoverHighlight = this._recorder.injectedScript.utils.elementText(this._textCache, target).full ? { elements: [target], selector: '', color: HighlightColors.assert } : null;
+      this._hoverHighlight = this._recorder.injectedScript.utils.elementText(this._textCache, target).full ? { elements: [target], selector: '', color: getHighlightColors().assert } : null;
     } else if (this._elementHasValue(target)) {
       const generated = this._recorder.injectedScript.generateSelector(target, { testIdAttributeName: this._recorder.state.testIdAttributeName });
-      this._hoverHighlight = { selector: generated.selector, elements: generated.elements, color: HighlightColors.assert };
+      this._hoverHighlight = { selector: generated.selector, elements: generated.elements, color: getHighlightColors().assert };
     } else {
       this._hoverHighlight = null;
     }
@@ -1057,7 +1062,7 @@ class TextAssertionTool implements RecorderTool {
       }
     } else if (this._kind === 'snapshot') {
       const generated = this._recorder.injectedScript.generateSelector(target, { testIdAttributeName: this._recorder.state.testIdAttributeName, forTextExpect: true });
-      this._hoverHighlight = { selector: generated.selector, elements: generated.elements, color: HighlightColors.assert };
+      this._hoverHighlight = { selector: generated.selector, elements: generated.elements, color: getHighlightColors().assert };
       // forTextExpect can update the target, re-highlight it.
       this._recorder.updateHighlight(this._hoverHighlight, true);
 
@@ -1069,7 +1074,7 @@ class TextAssertionTool implements RecorderTool {
       };
     } else {
       const generated = this._recorder.injectedScript.generateSelector(target, { testIdAttributeName: this._recorder.state.testIdAttributeName, forTextExpect: true });
-      this._hoverHighlight = { selector: generated.selector, elements: generated.elements, color: HighlightColors.assert };
+      this._hoverHighlight = { selector: generated.selector, elements: generated.elements, color: getHighlightColors().assert };
       // forTextExpect can update the target, re-highlight it.
       this._recorder.updateHighlight(this._hoverHighlight, true);
 
@@ -1175,48 +1180,30 @@ class Overlay {
   constructor(recorder: Recorder) {
     this._recorder = recorder;
     const document = this._recorder.document;
-    this._overlayElement = document.createElement('x-pw-overlay');
-    const toolsListElement = document.createElement('x-pw-tools-list');
+    const factories = getFactories();
+    this._overlayElement = factories.createOverlay(document);
+    const toolsListElement = factories.createToolsList(document);
     this._overlayElement.appendChild(toolsListElement);
 
-    this._dragHandle = document.createElement('x-pw-tool-gripper');
-    this._dragHandle.appendChild(document.createElement('x-div'));
+    this._dragHandle = factories.createToolGripper(document);
     toolsListElement.appendChild(this._dragHandle);
 
-    this._recordToggle = this._recorder.document.createElement('x-pw-tool-item');
-    this._recordToggle.title = 'Record';
-    this._recordToggle.classList.add('record');
-    this._recordToggle.appendChild(this._recorder.document.createElement('x-div'));
+    this._recordToggle = factories.createToolItem(document, 'record', 'Record');
     toolsListElement.appendChild(this._recordToggle);
 
-    this._pickLocatorToggle = this._recorder.document.createElement('x-pw-tool-item');
-    this._pickLocatorToggle.title = 'Pick locator';
-    this._pickLocatorToggle.classList.add('pick-locator');
-    this._pickLocatorToggle.appendChild(this._recorder.document.createElement('x-div'));
+    this._pickLocatorToggle = factories.createToolItem(document, 'pick-locator', 'Pick locator');
     toolsListElement.appendChild(this._pickLocatorToggle);
 
-    this._assertVisibilityToggle = this._recorder.document.createElement('x-pw-tool-item');
-    this._assertVisibilityToggle.title = 'Assert visibility';
-    this._assertVisibilityToggle.classList.add('visibility');
-    this._assertVisibilityToggle.appendChild(this._recorder.document.createElement('x-div'));
+    this._assertVisibilityToggle = factories.createToolItem(document, 'visibility', 'Assert visibility');
     toolsListElement.appendChild(this._assertVisibilityToggle);
 
-    this._assertTextToggle = this._recorder.document.createElement('x-pw-tool-item');
-    this._assertTextToggle.title = 'Assert text';
-    this._assertTextToggle.classList.add('text');
-    this._assertTextToggle.appendChild(this._recorder.document.createElement('x-div'));
+    this._assertTextToggle = factories.createToolItem(document, 'text', 'Assert text');
     toolsListElement.appendChild(this._assertTextToggle);
 
-    this._assertValuesToggle = this._recorder.document.createElement('x-pw-tool-item');
-    this._assertValuesToggle.title = 'Assert value';
-    this._assertValuesToggle.classList.add('value');
-    this._assertValuesToggle.appendChild(this._recorder.document.createElement('x-div'));
+    this._assertValuesToggle = factories.createToolItem(document, 'value', 'Assert value');
     toolsListElement.appendChild(this._assertValuesToggle);
 
-    this._assertSnapshotToggle = this._recorder.document.createElement('x-pw-tool-item');
-    this._assertSnapshotToggle.title = 'Assert snapshot';
-    this._assertSnapshotToggle.classList.add('snapshot');
-    this._assertSnapshotToggle.appendChild(this._recorder.document.createElement('x-div'));
+    this._assertSnapshotToggle = factories.createToolItem(document, 'snapshot', 'Assert snapshot');
     toolsListElement.appendChild(this._assertSnapshotToggle);
 
     this._updateVisualPosition();
@@ -1503,7 +1490,7 @@ export class Recorder {
     if (this._lastHighlightedAriaTemplateJSON !== ariaTemplateJSON) {
       const elements = state.ariaTemplate ? this.injectedScript.getAllElementsMatchingExpectAriaTemplate(this.document, state.ariaTemplate) : [];
       if (elements.length) {
-        const color = elements.length > 1 ? HighlightColors.multiple : HighlightColors.single;
+        const color = elements.length > 1 ? getHighlightColors().multiple : getHighlightColors().single;
         highlight = elements.map(element => ({ element, color }));
         this._lastHighlightedAriaTemplateJSON = ariaTemplateJSON;
       } else {
@@ -1750,24 +1737,17 @@ class Dialog {
     onCancel?: () => void;
     autosize?: boolean;
   }) {
-    const acceptButton = this._recorder.document.createElement('x-pw-tool-item');
-    acceptButton.title = 'Accept';
-    acceptButton.classList.add('accept');
-    acceptButton.appendChild(this._recorder.document.createElement('x-div'));
+    const factories = getFactories();
+    const acceptButton = factories.createToolItem(this._recorder.document, 'accept', 'Accept');
     acceptButton.addEventListener('click', () => options.onCommit?.());
 
-    const cancelButton = this._recorder.document.createElement('x-pw-tool-item');
-    cancelButton.title = 'Close';
-    cancelButton.classList.add('cancel');
-    cancelButton.appendChild(this._recorder.document.createElement('x-div'));
+    const cancelButton = factories.createToolItem(this._recorder.document, 'cancel', 'Close');
     cancelButton.addEventListener('click', () => {
       this.close();
       options.onCancel?.();
     });
 
-    this._dialogElement = this._recorder.document.createElement('x-pw-dialog');
-    if (options.autosize)
-      this._dialogElement.classList.add('autosize');
+    this._dialogElement = factories.createDialog(this._recorder.document, !!options.autosize);
 
     this._keyboardListener = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -1790,17 +1770,17 @@ class Dialog {
     // Ensure any clicks in the dialog are caught, rather than passing through to the page and thus closing the dialog
     this._dialogElement.addEventListener('click', event => event.stopPropagation());
 
-    const toolbarElement = this._recorder.document.createElement('x-pw-tools-list');
+    const toolbarElement = factories.createToolsList(this._recorder.document);
     const labelElement = this._recorder.document.createElement('label');
     labelElement.textContent = options.label;
     toolbarElement.appendChild(labelElement);
-    toolbarElement.appendChild(this._recorder.document.createElement('x-spacer'));
+    toolbarElement.appendChild(factories.createSpacer(this._recorder.document));
     if (options.onCommit)
       toolbarElement.appendChild(acceptButton);
     toolbarElement.appendChild(cancelButton);
 
     this._dialogElement.appendChild(toolbarElement);
-    const bodyElement = this._recorder.document.createElement('x-pw-dialog-body');
+    const bodyElement = factories.createDialogBody(this._recorder.document);
     bodyElement.appendChild(options.body);
     this._dialogElement.appendChild(bodyElement);
     this._recorder.highlight.appendChild(this._dialogElement);
@@ -1905,7 +1885,7 @@ function entriesForSelectorHighlight(injectedScript: InjectedScript, language: L
   try {
     const parsedSelector = injectedScript.parseSelector(selector);
     const elements = injectedScript.querySelectorAll(parsedSelector, ownerDocument);
-    const color = elements.length > 1 ? HighlightColors.multiple : HighlightColors.single;
+    const color = elements.length > 1 ? getHighlightColors().multiple : getHighlightColors().single;
     const locator = injectedScript.utils.asLocator(language, selector);
     return elements.map((element, index) => {
       const suffix = elements.length > 1 ? ` [${index + 1} of ${elements.length}]` : '';

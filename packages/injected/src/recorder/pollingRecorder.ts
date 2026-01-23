@@ -16,8 +16,16 @@
 
 import { Recorder } from './recorder';
 
+/**
+ * CUSTOMIZATION: Import configureRecorder to apply custom UI settings.
+ * This must be called BEFORE creating the Recorder (which creates Highlight).
+ * See recorderElementFactories.ts for full documentation.
+ */
+import { configureRecorder } from './recorderElementFactories';
+
 import type { InjectedScript } from '../injectedScript';
 import type { RecorderDelegate } from './recorder';
+import type { RecorderCustomization } from './recorderElementFactories';
 import type * as actions from '@recorder/actions';
 import type { ElementInfo, Mode, OverlayState, UIState } from '@recorder/recorderTypes';
 
@@ -37,7 +45,16 @@ export class PollingRecorder implements RecorderDelegate {
   private _pollRecorderModeTimer: number | undefined;
   private _lastStateJSON: string | undefined;
 
-  constructor(injectedScript: InjectedScript, options?: { recorderMode?: 'default' | 'api' }) {
+  constructor(injectedScript: InjectedScript, options?: { recorderMode?: 'default' | 'api', customization?: RecorderCustomization }) {
+    /**
+     * CUSTOMIZATION: Apply custom settings before Recorder instantiation.
+     * Order matters: configureRecorder() sets up window.__pwRecorderConfig,
+     * which is read by Recorder -> Highlight during construction.
+     *
+     * The customization object comes from server/recorder.ts via extendInjectedScript().
+     */
+    if (options?.customization)
+      configureRecorder(options.customization);
     this._recorder = new Recorder(injectedScript, options);
     this._embedder = injectedScript.window as any;
 

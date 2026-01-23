@@ -17,7 +17,15 @@
 import { asLocator } from '@isomorphic/locatorGenerators';
 import { stringifySelector } from '@isomorphic/selectorParser';
 
-import highlightCSS from './highlight.css?inline';
+/**
+ * CUSTOMIZATION: Import factories from recorderElementFactories instead of using
+ * inline document.createElement() calls. This allows external apps to customize
+ * element creation. See recorderElementFactories.ts for details.
+ *
+ * MERGE CONFLICT NOTE: If upstream adds new element creation in this file,
+ * replace `doc.createElement('x-pw-*')` with `getFactories().create*(doc)`.
+ */
+import { getFactories, getHighlightCSS, getHighlightColors } from './recorder/recorderElementFactories';
 
 import type { Language } from '@isomorphic/locatorGenerators';
 import type { ParsedSelector } from '@isomorphic/selectorParser';
@@ -54,8 +62,9 @@ export class Highlight {
   constructor(injectedScript: InjectedScript) {
     this._injectedScript = injectedScript;
     const document = injectedScript.document;
+    const factories = getFactories();
     this._isUnderTest = injectedScript.isUnderTest;
-    this._glassPaneElement = document.createElement('x-pw-glass');
+    this._glassPaneElement = factories.createGlassPane(document);
     this._glassPaneElement.style.position = 'fixed';
     this._glassPaneElement.style.top = '0';
     this._glassPaneElement.style.right = '0';
@@ -65,11 +74,12 @@ export class Highlight {
     this._glassPaneElement.style.pointerEvents = 'none';
     this._glassPaneElement.style.display = 'flex';
     this._glassPaneElement.style.backgroundColor = 'transparent';
-    this._actionPointElement = document.createElement('x-pw-action-point');
+    this._actionPointElement = factories.createActionPoint(document);
     this._actionPointElement.setAttribute('hidden', 'true');
     this._glassPaneShadow = this._glassPaneElement.attachShadow({ mode: this._isUnderTest ? 'open' : 'closed' });
     // workaround for firefox: when taking screenshots, it complains adoptedStyleSheets.push
     // is not a function, so we fallback to style injection
+    const highlightCSS = getHighlightCSS();
     if (typeof this._glassPaneShadow.adoptedStyleSheets.push === 'function') {
       const sheet = new this._injectedScript.window.CSSStyleSheet();
       sheet.replaceSync(highlightCSS);
@@ -99,7 +109,8 @@ export class Highlight {
       this._injectedScript.utils.builtins.cancelAnimationFrame(this._rafRequest);
     const elements = this._injectedScript.querySelectorAll(selector, this._injectedScript.document.documentElement);
     const locator = asLocator(this._language, stringifySelector(selector));
-    const color = elements.length > 1 ? '#f6b26b7f' : '#6fa8dc7f';
+    const colors = getHighlightColors();
+    const color = elements.length > 1 ? colors.multiple : colors.single;
     this.updateHighlight(elements.map((element, index) => {
       const suffix = elements.length > 1 ? ` [${index + 1} of ${elements.length}]` : '';
       return { element, color, tooltipText: locator + suffix };
@@ -145,19 +156,19 @@ export class Highlight {
     // 1. Destroy the layout
     this.clearHighlight();
 
+    const factories = getFactories();
     for (const entry of entries) {
       const highlightElement = this._createHighlightElement();
       this._glassPaneShadow.appendChild(highlightElement);
 
       let tooltipElement;
       if (entry.tooltipText) {
-        tooltipElement = this._injectedScript.document.createElement('x-pw-tooltip');
+        tooltipElement = factories.createTooltip(this._injectedScript.document);
         this._glassPaneShadow.appendChild(tooltipElement);
         tooltipElement.style.top = '0';
         tooltipElement.style.left = '0';
         tooltipElement.style.display = 'flex';
-        const lineElement = this._injectedScript.document.createElement('x-pw-tooltip-line');
-        lineElement.textContent = entry.tooltipText;
+        const lineElement = factories.createTooltipLine(this._injectedScript.document, entry.tooltipText);
         tooltipElement.appendChild(lineElement);
       }
       this._renderedEntries.push({ targetElement: entry.element, color: entry.color, tooltipElement, highlightElement });
@@ -257,7 +268,7 @@ export class Highlight {
   }
 
   private _createHighlightElement(): HTMLElement {
-    return this._injectedScript.document.createElement('x-pw-highlight');
+    return getFactories().createHighlight(this._injectedScript.document);
   }
 
   appendChild(element: Element) {
