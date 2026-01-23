@@ -769,4 +769,133 @@ test.describe('Shadcn theme customization', () => {
       await browser.close();
     }
   });
+
+  test('should support custom createDialogLayout for footer buttons', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      // Custom factories with Shadcn-style dialog layout (header/body/footer)
+      const customFactories = `
+        module.exports = {
+          createDialogHeader: (doc) => {
+            const el = doc.createElement('x-pw-dialog-header');
+            el.setAttribute('data-custom', 'header');
+            return el;
+          },
+          createDialogTitle: (doc, text) => {
+            const el = doc.createElement('x-pw-dialog-title');
+            el.textContent = text;
+            el.setAttribute('data-custom', 'title');
+            return el;
+          },
+          createDialogFooter: (doc) => {
+            const el = doc.createElement('x-pw-dialog-footer');
+            el.setAttribute('data-custom', 'footer');
+            return el;
+          },
+          createButton: (doc, text, variant) => {
+            const el = doc.createElement('x-pw-button');
+            el.textContent = text;
+            if (variant) el.classList.add(variant);
+            el.setAttribute('data-custom', 'button');
+            return el;
+          },
+          createDialogLayout: (doc, options, factories) => {
+            const { dialogElement, label, body, onAccept, onCancel } = options;
+
+            // Header with title at top
+            const headerElement = factories.createDialogHeader(doc);
+            const titleElement = factories.createDialogTitle(doc, label);
+            headerElement.appendChild(titleElement);
+            dialogElement.appendChild(headerElement);
+
+            // Body with content in middle
+            const bodyElement = factories.createDialogBody(doc);
+            bodyElement.appendChild(body);
+            dialogElement.appendChild(bodyElement);
+
+            // Footer with buttons at bottom
+            const footerElement = factories.createDialogFooter(doc);
+            const cancelButton = factories.createButton(doc, 'Cancel', 'outline');
+            cancelButton.addEventListener('click', () => onCancel());
+            footerElement.appendChild(cancelButton);
+
+            if (onAccept) {
+              const acceptButton = factories.createButton(doc, 'Accept');
+              acceptButton.addEventListener('click', () => onAccept());
+              footerElement.appendChild(acceptButton);
+            }
+
+            dialogElement.appendChild(footerElement);
+          },
+        };
+      `;
+
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+        customization: {
+          highlightCSS: shadcnCSS,
+          elementFactories: customFactories,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<p>Some text to assert</p>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Click on "Assert text" tool to open dialog
+      const assertTextButton = await page.evaluateHandle(() => {
+        const glass = document.querySelector('x-pw-glass');
+        if (!glass || !glass.shadowRoot) return null;
+        return glass.shadowRoot.querySelector('x-pw-tool-item.text');
+      });
+
+      if (assertTextButton) {
+        await assertTextButton.asElement()?.click();
+        await page.waitForTimeout(300);
+
+        // Click on the paragraph to trigger assert dialog
+        await page.locator('p').click();
+        await page.waitForTimeout(500);
+
+        // Check dialog structure
+        const dialogInfo = await page.evaluate(() => {
+          const glass = document.querySelector('x-pw-glass');
+          if (!glass || !glass.shadowRoot) return { error: 'no glass' };
+
+          const dialog = glass.shadowRoot.querySelector('x-pw-dialog');
+          if (!dialog) return { error: 'no dialog' };
+
+          const header = dialog.querySelector('x-pw-dialog-header');
+          const title = dialog.querySelector('x-pw-dialog-title');
+          const footer = dialog.querySelector('x-pw-dialog-footer');
+          const buttons = dialog.querySelectorAll('x-pw-button');
+
+          return {
+            hasHeader: !!header,
+            headerCustomAttr: header?.getAttribute('data-custom'),
+            hasTitle: !!title,
+            titleCustomAttr: title?.getAttribute('data-custom'),
+            hasFooter: !!footer,
+            footerCustomAttr: footer?.getAttribute('data-custom'),
+            buttonCount: buttons.length,
+            buttonCustomAttr: buttons[0]?.getAttribute('data-custom'),
+          };
+        });
+
+        expect(dialogInfo.hasHeader).toBe(true);
+        expect(dialogInfo.headerCustomAttr).toBe('header');
+        expect(dialogInfo.hasTitle).toBe(true);
+        expect(dialogInfo.titleCustomAttr).toBe('title');
+        expect(dialogInfo.hasFooter).toBe(true);
+        expect(dialogInfo.footerCustomAttr).toBe('footer');
+        expect(dialogInfo.buttonCount).toBeGreaterThan(0);
+        expect(dialogInfo.buttonCustomAttr).toBe('button');
+      }
+    } finally {
+      await browser.close();
+    }
+  });
 });
