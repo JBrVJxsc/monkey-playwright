@@ -899,3 +899,387 @@ test.describe('Shadcn theme customization', () => {
     }
   });
 });
+
+/**
+ * Tool Icon Factory Tests (createToolIcon)
+ *
+ * These tests verify the createToolIcon factory API which allows customizing
+ * the icons rendered inside tool items. This enables use of inline SVG icons
+ * (like Lucide) instead of the default clip-path based x-div icons.
+ *
+ * Key implementation notes:
+ * - Default createToolIcon returns x-div for backwards compatibility
+ * - Custom createToolIcon can return any Element (typically SVG)
+ * - createToolItem and createToolGripper use createToolIcon internally
+ */
+test.describe('createToolIcon factory customization', () => {
+  test('should use default x-div icon when no custom createToolIcon provided', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      // Enable recorder without custom factories
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button>Click me</button>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Check that tool items use default x-div icons
+      const iconInfo = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        if (!glass || !glass.shadowRoot) return { error: 'no glass' };
+
+        const recordTool = glass.shadowRoot.querySelector('x-pw-tool-item.record');
+        if (!recordTool) return { error: 'no record tool' };
+
+        const iconChild = recordTool.firstElementChild;
+        return {
+          tagName: iconChild?.tagName.toLowerCase(),
+          isSvg: iconChild?.tagName.toLowerCase() === 'svg',
+          isXDiv: iconChild?.tagName.toLowerCase() === 'x-div',
+        };
+      });
+
+      expect(iconInfo).toBeTruthy();
+      expect(iconInfo.isXDiv).toBe(true);
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should apply custom createToolIcon factory with inline SVG', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      // Custom factories with inline SVG icons (Lucide-style)
+      const customFactories = `
+        const ICONS = {
+          'record': 'M12 12m-10 0a10 10 0 1 0 20 0a10 10 0 1 0 -20 0',
+          'pick-locator': 'M21 11V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h6',
+        };
+
+        module.exports = {
+          createToolIcon: (doc, iconName) => {
+            const svg = doc.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('viewBox', '0 0 24 24');
+            svg.setAttribute('width', '16');
+            svg.setAttribute('height', '16');
+            svg.classList.add('pw-icon');
+            svg.setAttribute('data-icon-name', iconName);
+
+            const pathData = ICONS[iconName];
+            if (pathData) {
+              const path = doc.createElementNS('http://www.w3.org/2000/svg', 'path');
+              path.setAttribute('d', pathData);
+              svg.appendChild(path);
+            }
+
+            return svg;
+          },
+          createToolItem: (doc, name, title) => {
+            const el = doc.createElement('x-pw-tool-item');
+            el.classList.add(name);
+            el.title = title;
+            // Use createToolIcon for inline SVG
+            el.appendChild(module.exports.createToolIcon(doc, name));
+            return el;
+          },
+        };
+      `;
+
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+        customization: {
+          elementFactories: customFactories,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button>Click me</button>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Check that tool items use custom SVG icons
+      const iconInfo = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        if (!glass || !glass.shadowRoot) return { error: 'no glass' };
+
+        const recordTool = glass.shadowRoot.querySelector('x-pw-tool-item.record');
+        if (!recordTool) return { error: 'no record tool' };
+
+        const svg = recordTool.querySelector('svg');
+        return {
+          hasSvg: !!svg,
+          hasClass: svg?.classList.contains('pw-icon'),
+          iconName: svg?.getAttribute('data-icon-name'),
+          viewBox: svg?.getAttribute('viewBox'),
+          hasPath: !!svg?.querySelector('path'),
+        };
+      });
+
+      expect(iconInfo).toBeTruthy();
+      expect(iconInfo.hasSvg).toBe(true);
+      expect(iconInfo.hasClass).toBe(true);
+      expect(iconInfo.iconName).toBe('record');
+      expect(iconInfo.viewBox).toBe('0 0 24 24');
+      expect(iconInfo.hasPath).toBe(true);
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should apply custom createToolIcon to gripper', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      // Custom factories with SVG gripper icon
+      const customFactories = `
+        module.exports = {
+          createToolIcon: (doc, iconName) => {
+            const svg = doc.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('viewBox', '0 0 24 24');
+            svg.setAttribute('width', '16');
+            svg.setAttribute('height', '16');
+            svg.classList.add('pw-icon');
+            svg.setAttribute('data-gripper-icon', iconName);
+            return svg;
+          },
+          createToolGripper: (doc) => {
+            const el = doc.createElement('x-pw-tool-gripper');
+            el.appendChild(module.exports.createToolIcon(doc, 'gripper'));
+            return el;
+          },
+        };
+      `;
+
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+        customization: {
+          elementFactories: customFactories,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button>Click me</button>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Check that gripper uses custom SVG icon
+      const gripperInfo = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        if (!glass || !glass.shadowRoot) return { error: 'no glass' };
+
+        const gripper = glass.shadowRoot.querySelector('x-pw-tool-gripper');
+        if (!gripper) return { error: 'no gripper' };
+
+        const svg = gripper.querySelector('svg');
+        return {
+          hasSvg: !!svg,
+          hasClass: svg?.classList.contains('pw-icon'),
+          iconName: svg?.getAttribute('data-gripper-icon'),
+        };
+      });
+
+      expect(gripperInfo).toBeTruthy();
+      expect(gripperInfo.hasSvg).toBe(true);
+      expect(gripperInfo.hasClass).toBe(true);
+      expect(gripperInfo.iconName).toBe('gripper');
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should support full Lucide-style icon factory with stroke attributes', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      // Full Lucide-style icon factory with proper SVG attributes
+      const customFactories = `
+        const LUCIDE_ICONS = {
+          'record': { paths: ['M12 12m-10 0a10 10 0 1 0 20 0a10 10 0 1 0 -20 0'], fill: true },
+          'pick-locator': { paths: ['M21 11V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h6', 'm12 12 4 10 1.7-4.3L22 16Z'], fill: false },
+          'eye': { paths: ['M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0', 'M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z'], fill: false },
+        };
+
+        const ICON_MAP = {
+          'record': 'record',
+          'pick-locator': 'pick-locator',
+          'visibility': 'eye',
+        };
+
+        module.exports = {
+          createToolIcon: (doc, iconName) => {
+            const mappedName = ICON_MAP[iconName] || iconName;
+            const iconData = LUCIDE_ICONS[mappedName];
+
+            if (!iconData) {
+              // Fallback for unknown icons
+              return doc.createElement('x-div');
+            }
+
+            const svg = doc.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('viewBox', '0 0 24 24');
+            svg.setAttribute('width', '16');
+            svg.setAttribute('height', '16');
+            svg.setAttribute('fill', iconData.fill ? 'currentColor' : 'none');
+            svg.setAttribute('stroke', iconData.fill ? 'none' : 'currentColor');
+            svg.setAttribute('stroke-width', '2');
+            svg.setAttribute('stroke-linecap', 'round');
+            svg.setAttribute('stroke-linejoin', 'round');
+            svg.classList.add('pw-icon');
+
+            for (const d of iconData.paths) {
+              const path = doc.createElementNS('http://www.w3.org/2000/svg', 'path');
+              path.setAttribute('d', d);
+              svg.appendChild(path);
+            }
+
+            return svg;
+          },
+          createToolItem: (doc, name, title) => {
+            const el = doc.createElement('x-pw-tool-item');
+            el.classList.add(name);
+            el.title = title;
+            el.appendChild(module.exports.createToolIcon(doc, name));
+            return el;
+          },
+          createToolGripper: (doc) => {
+            const el = doc.createElement('x-pw-tool-gripper');
+            el.appendChild(module.exports.createToolIcon(doc, 'gripper'));
+            return el;
+          },
+        };
+      `;
+
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+        customization: {
+          elementFactories: customFactories,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button>Click me</button>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Check multiple tool items for proper SVG attributes
+      const iconsInfo = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        if (!glass || !glass.shadowRoot) return { error: 'no glass' };
+
+        const recordTool = glass.shadowRoot.querySelector('x-pw-tool-item.record');
+        const pickLocatorTool = glass.shadowRoot.querySelector('x-pw-tool-item.pick-locator');
+
+        const recordSvg = recordTool?.querySelector('svg');
+        const pickLocatorSvg = pickLocatorTool?.querySelector('svg');
+
+        return {
+          record: {
+            hasSvg: !!recordSvg,
+            fill: recordSvg?.getAttribute('fill'),
+            stroke: recordSvg?.getAttribute('stroke'),
+            pathCount: recordSvg?.querySelectorAll('path').length,
+          },
+          pickLocator: {
+            hasSvg: !!pickLocatorSvg,
+            fill: pickLocatorSvg?.getAttribute('fill'),
+            stroke: pickLocatorSvg?.getAttribute('stroke'),
+            strokeWidth: pickLocatorSvg?.getAttribute('stroke-width'),
+            pathCount: pickLocatorSvg?.querySelectorAll('path').length,
+          },
+        };
+      });
+
+      expect(iconsInfo).toBeTruthy();
+
+      // Record icon should be filled (circle)
+      expect(iconsInfo.record.hasSvg).toBe(true);
+      expect(iconsInfo.record.fill).toBe('currentColor');
+      expect(iconsInfo.record.stroke).toBe('none');
+      expect(iconsInfo.record.pathCount).toBe(1);
+
+      // Pick locator icon should be stroked
+      expect(iconsInfo.pickLocator.hasSvg).toBe(true);
+      expect(iconsInfo.pickLocator.fill).toBe('none');
+      expect(iconsInfo.pickLocator.stroke).toBe('currentColor');
+      expect(iconsInfo.pickLocator.strokeWidth).toBe('2');
+      expect(iconsInfo.pickLocator.pathCount).toBe(2);
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should fallback gracefully for unknown icon names', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      // Factory that returns x-div for unknown icons
+      const customFactories = `
+        const KNOWN_ICONS = ['record'];
+
+        module.exports = {
+          createToolIcon: (doc, iconName) => {
+            if (!KNOWN_ICONS.includes(iconName)) {
+              // Fallback to x-div for unknown icons
+              const fallback = doc.createElement('x-div');
+              fallback.setAttribute('data-fallback', 'true');
+              return fallback;
+            }
+
+            const svg = doc.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.classList.add('pw-icon');
+            return svg;
+          },
+          createToolItem: (doc, name, title) => {
+            const el = doc.createElement('x-pw-tool-item');
+            el.classList.add(name);
+            el.title = title;
+            el.appendChild(module.exports.createToolIcon(doc, name));
+            return el;
+          },
+        };
+      `;
+
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+        customization: {
+          elementFactories: customFactories,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button>Click me</button>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Check that record uses SVG but pick-locator falls back to x-div
+      const fallbackInfo = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        if (!glass || !glass.shadowRoot) return { error: 'no glass' };
+
+        const recordTool = glass.shadowRoot.querySelector('x-pw-tool-item.record');
+        const pickLocatorTool = glass.shadowRoot.querySelector('x-pw-tool-item.pick-locator');
+
+        return {
+          recordHasSvg: !!recordTool?.querySelector('svg'),
+          pickLocatorHasFallback: pickLocatorTool?.querySelector('x-div')?.getAttribute('data-fallback') === 'true',
+        };
+      });
+
+      expect(fallbackInfo).toBeTruthy();
+      expect(fallbackInfo.recordHasSvg).toBe(true);
+      expect(fallbackInfo.pickLocatorHasFallback).toBe(true);
+    } finally {
+      await browser.close();
+    }
+  });
+});

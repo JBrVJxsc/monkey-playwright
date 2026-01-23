@@ -161,6 +161,15 @@ export interface ElementFactories {
    */
   createToolItem(doc: Document, name: string, title: string): HTMLElement;
 
+  /**
+   * Creates an icon element for a tool button.
+   * Override this to use custom icons (e.g., inline SVG instead of clip-path).
+   * @param doc - Document to create element in
+   * @param iconName - Name of the icon (e.g., 'record', 'inspect', 'check')
+   * @returns Element to be appended inside the tool item
+   */
+  createToolIcon(doc: Document, iconName: string): Element;
+
   /** Creates a spacer element for toolbar layout */
   createSpacer(doc: Document): HTMLElement;
 
@@ -326,8 +335,15 @@ const defaultElementFactories: ElementFactories = {
     const el = doc.createElement('x-pw-tool-item');
     el.classList.add(name);
     el.title = title;
+    // Default uses x-div with clip-path icons
+    // Override createToolIcon for custom icons (e.g., inline SVG)
     el.appendChild(doc.createElement('x-div'));
     return el;
+  },
+  createToolIcon: (doc: Document, _iconName: string) => {
+    // Default returns x-div for backwards compatibility with clip-path icons
+    // Override this to return inline SVG or other icon elements
+    return doc.createElement('x-div');
   },
   createSpacer: (doc: Document) => doc.createElement('x-spacer'),
 
