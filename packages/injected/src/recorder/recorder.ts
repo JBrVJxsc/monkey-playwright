@@ -43,37 +43,6 @@ export interface RecorderDelegate {
   highlightUpdated?(): void;
 }
 
-// Interfaces for customizable UI components
-export interface IOverlay {
-  install(): void;
-  contains(element: Element): boolean;
-  setUIState(state: UIState): void;
-  flashToolSucceeded(tool: 'assertingVisibility' | 'assertingSnapshot' | 'assertingValue'): void;
-  onMouseMove?(event: MouseEvent): boolean | void;
-  onMouseUp?(event: MouseEvent): boolean | void;
-  onClick?(event: MouseEvent): boolean | void;
-  onDblClick?(event: MouseEvent): boolean | void;
-  destroy?(): void;
-}
-
-export interface IDialog {
-  install?(): void;
-  isShowing(): boolean;
-  show(options: { label: string; body: Element; onCommit?: () => void; onCancel?: () => void; autosize?: boolean }): HTMLElement;
-  moveTo(top: number, left: number): void;
-  close(): void;
-  destroy?(): void;
-}
-
-export interface RecorderOptions {
-  recorderMode?: 'default' | 'api';
-  customHighlightCSS?: string;
-  createOverlay?: (recorder: Recorder) => IOverlay;
-  createDialog?: (recorder: Recorder) => IDialog;
-  /** Skip appending clipPaths SVG - set to true when using custom UI that doesn't use clip-path icons */
-  skipClipPaths?: boolean;
-}
-
 interface RecorderTool {
   cursor?(): string;
   install?(): void;
@@ -227,12 +196,12 @@ class RecordActionTool implements RecorderTool {
   private _expectProgrammaticKeyUp = false;
   private _pendingClickAction: { action: actions.ClickAction, timeout: number } | undefined;
   private _observer: MutationObserver | null = null;
-  private _dialog: IDialog;
+  private _dialog: Dialog;
 
   constructor(recorder: Recorder) {
     this._recorder = recorder;
     this._performingActions = new Set();
-    this._dialog = recorder.createDialog();
+    this._dialog = new Dialog(recorder);
   }
 
   cursor() {
@@ -985,7 +954,7 @@ class TextAssertionTool implements RecorderTool {
   private _recorder: Recorder;
   private _hoverHighlight: HighlightModelWithSelector | null = null;
   private _action: actions.AssertAction | null = null;
-  private _dialog: IDialog;
+  private _dialog: Dialog;
   private _textCache: Map<Element | ShadowRoot, ElementText>;
   private _kind: 'text' | 'value' | 'snapshot';
 
@@ -993,7 +962,7 @@ class TextAssertionTool implements RecorderTool {
     this._recorder = recorder;
     this._textCache = new Map();
     this._kind = kind;
-    this._dialog = recorder.createDialog();
+    this._dialog = new Dialog(recorder);
   }
 
   cursor() {
@@ -1409,7 +1378,7 @@ export class Recorder {
   private _lastHighlightedAriaTemplateJSON: string = 'undefined';
   private _lastActionAutoexpectSnapshot: AriaSnapshot | undefined;
   readonly highlight: Highlight;
-  readonly overlay: IOverlay | undefined;
+  readonly overlay: Overlay | undefined;
   private _stylesheet: CSSStyleSheet;
   state: UIState = {
     mode: 'none',
@@ -1419,13 +1388,11 @@ export class Recorder {
   };
   readonly document: Document;
   private _delegate: RecorderDelegate = {};
-  private _options: RecorderOptions;
 
-  constructor(injectedScript: InjectedScript, options?: RecorderOptions) {
-    this._options = options || {};
+  constructor(injectedScript: InjectedScript, options?: { recorderMode?: 'default' | 'api' }) {
     this.document = injectedScript.document;
     this.injectedScript = injectedScript;
-    this.highlight = injectedScript.createHighlight(options?.customHighlightCSS);
+    this.highlight = injectedScript.createHighlight();
     this._tools = {
       'none': new NoneTool(),
       'standby': new NoneTool(),
@@ -1440,8 +1407,7 @@ export class Recorder {
     this._currentTool = this._tools.none;
     this._currentTool.install?.();
     if (injectedScript.window.top === injectedScript.window) {
-      // Use custom factory if provided, otherwise use default
-      this.overlay = options?.createOverlay ? options.createOverlay(this) : new Overlay(this);
+      this.overlay = new Overlay(this);
       this.overlay.setUIState(this.state);
     }
     this._stylesheet = new injectedScript.window.CSSStyleSheet();
@@ -1488,17 +1454,10 @@ export class Recorder {
     recreationInterval = this.injectedScript.utils.builtins.setTimeout(recreate, 500);
     this._listeners.push(() => this.injectedScript.utils.builtins.clearTimeout(recreationInterval));
 
-    // Only append clipPaths SVG if not skipped (custom UIs may not need clip-path icons)
-    if (!this._options.skipClipPaths) {
-      this.highlight.appendChild(createSvgElement(this.document, clipPaths));
-    }
+    this.highlight.appendChild(createSvgElement(this.document, clipPaths));
     this.overlay?.install();
     this._currentTool?.install?.();
     this.document.adoptedStyleSheets.push(this._stylesheet);
-  }
-
-  createDialog(): IDialog {
-    return this._options.createDialog ? this._options.createDialog(this) : new Dialog(this);
   }
 
   private _switchCurrentTool() {

@@ -1290,8 +1290,8 @@ export class InjectedScript {
     return error;
   }
 
-  createHighlight(customCSS?: string) {
-    return new Highlight(this, customCSS);
+  createHighlight() {
+    return new Highlight(this);
   }
 
   maskSelectors(selectors: ParsedSelector[], color: string) {

@@ -1335,8 +1335,6 @@ BrowserContext:
         outputFile: string?
         handleSIGINT: boolean?
         omitCallTracking: boolean?
-        customRecorderScript: string?
-        customHighlightCSS: string?
 
     disableRecorder:
       internal: true

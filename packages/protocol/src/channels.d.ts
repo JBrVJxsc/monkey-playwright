@@ -1861,8 +1861,6 @@ export type BrowserContextEnableRecorderParams = {
   outputFile?: string,
   handleSIGINT?: boolean,
   omitCallTracking?: boolean,
-  customRecorderScript?: string,
-  customHighlightCSS?: string,
 };
 export type BrowserContextEnableRecorderOptions = {
   language?: string,
@@ -1877,8 +1875,6 @@ export type BrowserContextEnableRecorderOptions = {
   outputFile?: string,
   handleSIGINT?: boolean,
   omitCallTracking?: boolean,
-  customRecorderScript?: string,
-  customHighlightCSS?: string,
 };
 export type BrowserContextEnableRecorderResult = void;
 export type BrowserContextDisableRecorderParams = {};

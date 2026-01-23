@@ -17,11 +17,9 @@
 import { Recorder } from './recorder';
 
 import type { InjectedScript } from '../injectedScript';
-import type { RecorderDelegate, RecorderOptions } from './recorder';
+import type { RecorderDelegate } from './recorder';
 import type * as actions from '@recorder/actions';
 import type { ElementInfo, Mode, OverlayState, UIState } from '@recorder/recorderTypes';
-
-export type { RecorderOptions, RecorderDelegate, IOverlay, IDialog } from './recorder';
 
 interface Embedder {
   __pw_recorderPerformAction(action: actions.PerformOnRecordAction): Promise<void>;
@@ -39,7 +37,7 @@ export class PollingRecorder implements RecorderDelegate {
   private _pollRecorderModeTimer: number | undefined;
   private _lastStateJSON: string | undefined;
 
-  constructor(injectedScript: InjectedScript, options?: RecorderOptions) {
+  constructor(injectedScript: InjectedScript, options?: { recorderMode?: 'default' | 'api' }) {
     this._recorder = new Recorder(injectedScript, options);
     this._embedder = injectedScript.window as any;
 
