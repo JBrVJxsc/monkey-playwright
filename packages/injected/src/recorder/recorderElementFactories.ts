@@ -215,6 +215,31 @@ export interface ElementFactories {
    * @param variant - Optional variant class (e.g., 'outline', 'primary')
    */
   createButton(doc: Document, text: string, variant?: string): HTMLElement;
+
+  /**
+   * Creates the complete dialog layout including header/toolbar, body, and footer/buttons.
+   * Override this factory to completely customize dialog structure.
+   *
+   * @param doc - Document to create elements in
+   * @param options - Dialog configuration
+   * @param options.dialogElement - The dialog container to append content to
+   * @param options.label - Dialog title/label text
+   * @param options.body - Body content element
+   * @param options.onAccept - Callback when accept is clicked (undefined if no accept button)
+   * @param options.onCancel - Callback when cancel is clicked
+   * @param factories - Reference to all factories for creating sub-elements
+   */
+  createDialogLayout(
+    doc: Document,
+    options: {
+      dialogElement: HTMLElement;
+      label: string;
+      body: Element;
+      onAccept?: () => void;
+      onCancel: () => void;
+    },
+    factories: ElementFactories
+  ): void;
 }
 
 /**
@@ -343,6 +368,35 @@ const defaultElementFactories: ElementFactories = {
     if (variant)
       el.classList.add(variant);
     return el;
+  },
+
+  // Default dialog layout - toolbar with buttons at top (original Playwright style)
+  createDialogLayout: (doc, options, factories) => {
+    const { dialogElement, label, body, onAccept, onCancel } = options;
+
+    // Toolbar with label and buttons at top
+    const toolbarElement = factories.createToolsList(doc);
+    const labelElement = doc.createElement('label');
+    labelElement.textContent = label;
+    toolbarElement.appendChild(labelElement);
+    toolbarElement.appendChild(factories.createSpacer(doc));
+
+    if (onAccept) {
+      const acceptButton = factories.createToolItem(doc, 'accept', 'Accept');
+      acceptButton.addEventListener('click', () => onAccept());
+      toolbarElement.appendChild(acceptButton);
+    }
+
+    const cancelButton = factories.createToolItem(doc, 'cancel', 'Close');
+    cancelButton.addEventListener('click', () => onCancel());
+    toolbarElement.appendChild(cancelButton);
+
+    dialogElement.appendChild(toolbarElement);
+
+    // Body with content
+    const bodyElement = factories.createDialogBody(doc);
+    bodyElement.appendChild(body);
+    dialogElement.appendChild(bodyElement);
   },
 };
 

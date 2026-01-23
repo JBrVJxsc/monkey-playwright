@@ -1738,14 +1738,6 @@ class Dialog {
     autosize?: boolean;
   }) {
     const factories = getFactories();
-    const acceptButton = factories.createToolItem(this._recorder.document, 'accept', 'Accept');
-    acceptButton.addEventListener('click', () => options.onCommit?.());
-
-    const cancelButton = factories.createToolItem(this._recorder.document, 'cancel', 'Close');
-    cancelButton.addEventListener('click', () => {
-      this.close();
-      options.onCancel?.();
-    });
 
     this._dialogElement = factories.createDialog(this._recorder.document, !!options.autosize);
 
@@ -1770,19 +1762,29 @@ class Dialog {
     // Ensure any clicks in the dialog are caught, rather than passing through to the page and thus closing the dialog
     this._dialogElement.addEventListener('click', event => event.stopPropagation());
 
-    const toolbarElement = factories.createToolsList(this._recorder.document);
-    const labelElement = this._recorder.document.createElement('label');
-    labelElement.textContent = options.label;
-    toolbarElement.appendChild(labelElement);
-    toolbarElement.appendChild(factories.createSpacer(this._recorder.document));
-    if (options.onCommit)
-      toolbarElement.appendChild(acceptButton);
-    toolbarElement.appendChild(cancelButton);
+    if (options.autosize) {
+      // Autosize dialogs (context menus) - just show body content directly
+      const bodyElement = factories.createDialogBody(this._recorder.document);
+      bodyElement.appendChild(options.body);
+      this._dialogElement.appendChild(bodyElement);
+    } else {
+      // Full dialogs - delegate to createDialogLayout factory for customizable structure
+      factories.createDialogLayout(
+        this._recorder.document,
+        {
+          dialogElement: this._dialogElement,
+          label: options.label,
+          body: options.body,
+          onAccept: options.onCommit,
+          onCancel: () => {
+            this.close();
+            options.onCancel?.();
+          },
+        },
+        factories
+      );
+    }
 
-    this._dialogElement.appendChild(toolbarElement);
-    const bodyElement = factories.createDialogBody(this._recorder.document);
-    bodyElement.appendChild(options.body);
-    this._dialogElement.appendChild(bodyElement);
     this._recorder.highlight.appendChild(this._dialogElement);
     this._recorder.highlight.onGlassPaneClick(this._onGlassPaneClickHandler);
     this._recorder.document.addEventListener('keydown', this._keyboardListener, true);
