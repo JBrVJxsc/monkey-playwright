@@ -80,7 +80,7 @@ export class Recorder extends EventEmitter<RecorderEventMap> implements Instrume
   private _debugger: Debugger;
   private _omitCallTracking = false;
   private _currentLanguage: Language = 'javascript';
-  private _recorderMode: 'default' | 'api';
+  private _recorderMode: 'default' | 'api' | 'programmatic';
 
   private _signalProcessor: RecorderSignalProcessor;
   private _pageAliases = new Map<Page, string>();
@@ -332,6 +332,47 @@ export class Recorder extends EventEmitter<RecorderEventMap> implements Instrume
 
   callLog(): CallLog[] {
     return this._callLogs;
+  }
+
+  /**
+   * Handle commands from programmatic recorder API.
+   * This allows external callers (like monkey-react) to control the recorder
+   * without using the side window UI.
+   */
+  async handleCommand(method: string, params?: any): Promise<void> {
+    switch (method) {
+      case 'setMode':
+        if (params?.mode)
+          this.setMode(params.mode);
+        break;
+      case 'clear':
+        this.clear();
+        break;
+      case 'pause':
+        this.pause();
+        break;
+      case 'resume':
+        this.resume();
+        break;
+      case 'step':
+        this.step();
+        break;
+      case 'highlightRequested':
+        if (params?.selector)
+          this.setHighlightedSelector(params.selector);
+        if (params?.ariaTemplate)
+          this.setHighlightedAriaTemplate(params.ariaTemplate);
+        break;
+      case 'hideHighlight':
+        this.hideHighlightedSelector();
+        break;
+      case 'setLanguage':
+        if (params?.language)
+          this.setLanguage(params.language);
+        break;
+      default:
+        throw new Error(`Unknown recorder command: ${method}`);
+    }
   }
 
   private async _scopeHighlightedSelectorToFrame(frame: Frame): Promise<string | undefined> {

@@ -14,26 +14,36 @@
  * limitations under the License.
  */
 
-import { Recorder } from './recorder';
+import { Recorder } from "./recorder";
 
 /**
  * CUSTOMIZATION: Import configureRecorder to apply custom UI settings.
  * This must be called BEFORE creating the Recorder (which creates Highlight).
  * See recorderElementFactories.ts for full documentation.
  */
-import { configureRecorder } from './recorderElementFactories';
+import { configureRecorder } from "./recorderElementFactories";
 
-import type { InjectedScript } from '../injectedScript';
-import type { RecorderDelegate } from './recorder';
-import type { RecorderCustomization } from './recorderElementFactories';
-import type * as actions from '@recorder/actions';
-import type { ElementInfo, Mode, OverlayState, UIState } from '@recorder/recorderTypes';
+import type { InjectedScript } from "../injectedScript";
+import type { RecorderDelegate } from "./recorder";
+import type { RecorderCustomization } from "./recorderElementFactories";
+import type * as actions from "@recorder/actions";
+import type {
+  ElementInfo,
+  Mode,
+  OverlayState,
+  UIState,
+} from "@recorder/recorderTypes";
 
 interface Embedder {
-  __pw_recorderPerformAction(action: actions.PerformOnRecordAction): Promise<void>;
+  __pw_recorderPerformAction(
+    action: actions.PerformOnRecordAction,
+  ): Promise<void>;
   __pw_recorderRecordAction(action: actions.Action): Promise<void>;
   __pw_recorderState(): Promise<UIState>;
-  __pw_recorderElementPicked(element: { selector: string, ariaSnapshot?: string }): Promise<void>;
+  __pw_recorderElementPicked(element: {
+    selector: string;
+    ariaSnapshot?: string;
+  }): Promise<void>;
   __pw_recorderSetMode(mode: Mode): Promise<void>;
   __pw_recorderSetOverlayState(state: OverlayState): Promise<void>;
   __pw_refreshOverlay(): void;
@@ -45,7 +55,13 @@ export class PollingRecorder implements RecorderDelegate {
   private _pollRecorderModeTimer: number | undefined;
   private _lastStateJSON: string | undefined;
 
-  constructor(injectedScript: InjectedScript, options?: { recorderMode?: 'default' | 'api', customization?: RecorderCustomization }) {
+  constructor(
+    injectedScript: InjectedScript,
+    options?: {
+      recorderMode?: "default" | "api" | "programmatic";
+      customization?: RecorderCustomization;
+    },
+  ) {
     /**
      * CUSTOMIZATION: Apply custom settings before Recorder instantiation.
      * Order matters: configureRecorder() sets up window.__pwRecorderConfig,
@@ -53,16 +69,17 @@ export class PollingRecorder implements RecorderDelegate {
      *
      * The customization object comes from server/recorder.ts via extendInjectedScript().
      */
-    if (options?.customization)
-      configureRecorder(options.customization);
+    if (options?.customization) configureRecorder(options.customization);
     this._recorder = new Recorder(injectedScript, options);
     this._embedder = injectedScript.window as any;
 
-    injectedScript.onGlobalListenersRemoved.add(() => this._recorder.installListeners());
+    injectedScript.onGlobalListenersRemoved.add(() =>
+      this._recorder.installListeners(),
+    );
 
     const refreshOverlay = () => {
       this._lastStateJSON = undefined;
-      this._pollRecorderMode().catch(e => console.log(e)); // eslint-disable-line no-console
+      this._pollRecorderMode().catch((e) => console.log(e)); // eslint-disable-line no-console
     };
     this._embedder.__pw_refreshOverlay = refreshOverlay;
     refreshOverlay();
@@ -71,10 +88,16 @@ export class PollingRecorder implements RecorderDelegate {
   private async _pollRecorderMode() {
     const pollPeriod = 1000;
     if (this._pollRecorderModeTimer)
-      this._recorder.injectedScript.utils.builtins.clearTimeout(this._pollRecorderModeTimer);
+      this._recorder.injectedScript.utils.builtins.clearTimeout(
+        this._pollRecorderModeTimer,
+      );
     const state = await this._embedder.__pw_recorderState().catch(() => null);
     if (!state) {
-      this._pollRecorderModeTimer = this._recorder.injectedScript.utils.builtins.setTimeout(() => this._pollRecorderMode(), pollPeriod);
+      this._pollRecorderModeTimer =
+        this._recorder.injectedScript.utils.builtins.setTimeout(
+          () => this._pollRecorderMode(),
+          pollPeriod,
+        );
       return;
     }
 
@@ -90,7 +113,11 @@ export class PollingRecorder implements RecorderDelegate {
       this._recorder.setUIState(state, this);
     }
 
-    this._pollRecorderModeTimer = this._recorder.injectedScript.utils.builtins.setTimeout(() => this._pollRecorderMode(), pollPeriod);
+    this._pollRecorderModeTimer =
+      this._recorder.injectedScript.utils.builtins.setTimeout(
+        () => this._pollRecorderMode(),
+        pollPeriod,
+      );
   }
 
   async performAction(action: actions.PerformOnRecordAction) {

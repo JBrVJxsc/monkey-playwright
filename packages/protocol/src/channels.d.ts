@@ -1600,6 +1600,7 @@ export interface BrowserContextChannel extends BrowserContextEventTarget, EventT
   pause(params?: BrowserContextPauseParams, progress?: Progress): Promise<BrowserContextPauseResult>;
   enableRecorder(params: BrowserContextEnableRecorderParams, progress?: Progress): Promise<BrowserContextEnableRecorderResult>;
   disableRecorder(params?: BrowserContextDisableRecorderParams, progress?: Progress): Promise<BrowserContextDisableRecorderResult>;
+  sendRecorderCommand(params: BrowserContextSendRecorderCommandParams, progress?: Progress): Promise<BrowserContextSendRecorderCommandResult>;
   exposeConsoleApi(params?: BrowserContextExposeConsoleApiParams, progress?: Progress): Promise<BrowserContextExposeConsoleApiResult>;
   newCDPSession(params: BrowserContextNewCDPSessionParams, progress?: Progress): Promise<BrowserContextNewCDPSessionResult>;
   harStart(params: BrowserContextHarStartParams, progress?: Progress): Promise<BrowserContextHarStartResult>;
@@ -1673,9 +1674,9 @@ export type BrowserContextResponseEvent = {
   page?: PageChannel,
 };
 export type BrowserContextRecorderEventEvent = {
-  event: 'actionAdded' | 'actionUpdated' | 'signalAdded',
+  event: 'actionAdded' | 'actionUpdated' | 'signalAdded' | 'modeChanged' | 'pauseStateChanged' | 'sourcesUpdated' | 'pageNavigated' | 'elementPicked' | 'callLogsUpdated',
   data: any,
-  page: PageChannel,
+  page?: PageChannel,
   code: string,
 };
 export type BrowserContextAddCookiesParams = {
@@ -1851,7 +1852,7 @@ export type BrowserContextPauseResult = void;
 export type BrowserContextEnableRecorderParams = {
   language?: string,
   mode?: 'inspecting' | 'recording',
-  recorderMode?: 'default' | 'api',
+  recorderMode?: 'default' | 'api' | 'programmatic',
   pauseOnNextStatement?: boolean,
   testIdAttributeName?: string,
   launchOptions?: any,
@@ -1862,11 +1863,12 @@ export type BrowserContextEnableRecorderParams = {
   handleSIGINT?: boolean,
   omitCallTracking?: boolean,
   customization?: any,
+  showSidePanel?: boolean,
 };
 export type BrowserContextEnableRecorderOptions = {
   language?: string,
   mode?: 'inspecting' | 'recording',
-  recorderMode?: 'default' | 'api',
+  recorderMode?: 'default' | 'api' | 'programmatic',
   pauseOnNextStatement?: boolean,
   testIdAttributeName?: string,
   launchOptions?: any,
@@ -1877,11 +1879,20 @@ export type BrowserContextEnableRecorderOptions = {
   handleSIGINT?: boolean,
   omitCallTracking?: boolean,
   customization?: any,
+  showSidePanel?: boolean,
 };
 export type BrowserContextEnableRecorderResult = void;
 export type BrowserContextDisableRecorderParams = {};
 export type BrowserContextDisableRecorderOptions = {};
 export type BrowserContextDisableRecorderResult = void;
+export type BrowserContextSendRecorderCommandParams = {
+  method: string,
+  params?: any,
+};
+export type BrowserContextSendRecorderCommandOptions = {
+  params?: any,
+};
+export type BrowserContextSendRecorderCommandResult = void;
 export type BrowserContextExposeConsoleApiParams = {};
 export type BrowserContextExposeConsoleApiOptions = {};
 export type BrowserContextExposeConsoleApiResult = void;

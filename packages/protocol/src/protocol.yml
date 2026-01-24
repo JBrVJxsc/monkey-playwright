@@ -50,7 +50,6 @@ Point:
     x: float
     y: float
 
-
 Rect:
   type: object
   properties:
@@ -58,7 +57,6 @@ Rect:
     y: float
     width: float
     height: float
-
 
 SerializedValue:
   type: object
@@ -70,12 +68,12 @@ SerializedValue:
     v:
       type: enum?
       literals:
-      - null
-      - undefined
-      - NaN
-      - Infinity
-      - -Infinity
-      - "-0"
+        - null
+        - undefined
+        - NaN
+        - Infinity
+        - -Infinity
+        - "-0"
     # String representation of the Date.
     d: string?
     # String representation of the URL.
@@ -90,17 +88,17 @@ SerializedValue:
         k:
           type: enum
           literals:
-          - i8
-          - ui8
-          - ui8c
-          - i16
-          - ui16
-          - i32
-          - ui32
-          - f32
-          - f64
-          - bi64
-          - bui64
+            - i8
+            - ui8
+            - ui8c
+            - i16
+            - ui16
+            - i32
+            - ui32
+            - f32
+            - f64
+            - bi64
+            - bui64
     # Serialized Error object.
     e:
       type: object?
@@ -132,7 +130,6 @@ SerializedValue:
     # Ref to the object in value-type for circular reference resolution.
     ref: int?
 
-
 # Represents a value with handle references.
 SerializedArgument:
   type: object
@@ -141,7 +138,6 @@ SerializedArgument:
     handles:
       type: array
       items: Channel
-
 
 ExpectedTextValue:
   type: object
@@ -153,14 +149,12 @@ ExpectedTextValue:
     ignoreCase: boolean?
     normalizeWhiteSpace: boolean?
 
-
 SelectorEngine:
   type: object
   properties:
     name: string
     source: string
     contentScript: boolean?
-
 
 SetNetworkCookie:
   type: object
@@ -176,12 +170,11 @@ SetNetworkCookie:
     sameSite:
       type: enum?
       literals:
-      - Strict
-      - Lax
-      - None
+        - Strict
+        - Lax
+        - None
     partitionKey: string?
     _crHasCrossSiteAncestor: boolean?
-
 
 NetworkCookie:
   type: object
@@ -196,12 +189,11 @@ NetworkCookie:
     sameSite:
       type: enum
       literals:
-      - Strict
-      - Lax
-      - None
+        - Strict
+        - Lax
+        - None
     partitionKey: string?
     _crHasCrossSiteAncestor: boolean?
-
 
 NameValue:
   type: object
@@ -280,7 +272,6 @@ SerializedError:
         stack: string?
     value: SerializedValue?
 
-
 RecordHarOptions:
   type: object
   properties:
@@ -288,18 +279,17 @@ RecordHarOptions:
     content:
       type: enum?
       literals:
-      - embed
-      - attach
-      - omit
+        - embed
+        - attach
+        - omit
     mode:
       type: enum?
       literals:
-      - full
-      - minimal
+        - full
+        - minimal
     urlGlob: string?
     urlRegexSource: string?
     urlRegexFlags: string?
-
 
 FormField:
   type: object
@@ -316,10 +306,10 @@ FormField:
 SDKLanguage:
   type: enum
   literals:
-  - javascript
-  - python
-  - java
-  - csharp
+    - javascript
+    - python
+    - java
+    - csharp
 
 APIRequestContext:
   type: interface
@@ -328,7 +318,6 @@ APIRequestContext:
     tracing: Tracing
 
   commands:
-
     fetch:
       title: '{method} "{url}"'
       parameters:
@@ -396,7 +385,6 @@ APIRequestContext:
       parameters:
         reason: string?
 
-
 APIResponse:
   type: object
   properties:
@@ -408,14 +396,13 @@ APIResponse:
       type: array
       items: NameValue
 
-
 LifecycleEvent:
   type: enum
   literals:
-  - load
-  - domcontentloaded
-  - networkidle
-  - commit
+    - load
+    - domcontentloaded
+    - networkidle
+    - commit
 
 CommonScreenshotOptions:
   type: mixin
@@ -424,18 +411,18 @@ CommonScreenshotOptions:
     caret:
       type: enum?
       literals:
-      - hide
-      - initial
+        - hide
+        - initial
     animations:
       type: enum?
       literals:
-      - disabled
-      - allow
+        - disabled
+        - allow
     scale:
       type: enum?
       literals:
-      - css
-      - device
+        - css
+        - device
     mask:
       type: array?
       items:
@@ -479,7 +466,6 @@ LaunchOptions:
     chromiumSandbox: boolean?
     firefoxUserPrefs: json?
     cdpPort: int?
-
 
 ContextOptions:
   type: mixin
@@ -533,42 +519,42 @@ ContextOptions:
         send:
           type: enum?
           literals:
-          - always
-          - unauthorized
+            - always
+            - unauthorized
     deviceScaleFactor: float?
     isMobile: boolean?
     hasTouch: boolean?
     colorScheme:
       type: enum?
       literals:
-      - dark
-      - light
-      - no-preference
-      - no-override
+        - dark
+        - light
+        - no-preference
+        - no-override
     reducedMotion:
       type: enum?
       literals:
-      - reduce
-      - no-preference
-      - no-override
+        - reduce
+        - no-preference
+        - no-override
     forcedColors:
       type: enum?
       literals:
-      - active
-      - none
-      - no-override
+        - active
+        - none
+        - no-override
     acceptDownloads:
       type: enum?
       literals:
-      - accept
-      - deny
-      - internal-browser-default
+        - accept
+        - deny
+        - internal-browser-default
     contrast:
       type: enum?
       literals:
-      - no-preference
-      - more
-      - no-override
+        - no-preference
+        - more
+        - no-override
     baseURL: string?
     recordVideo:
       type: object?
@@ -583,8 +569,8 @@ ContextOptions:
     serviceWorkers:
       type: enum?
       literals:
-      - allow
-      - block
+        - allow
+        - block
     selectorEngines:
       type: array?
       items: SelectorEngine
@@ -620,12 +606,11 @@ LocalUtils:
               defaultBrowserType:
                 type: enum
                 literals:
-                - chromium
-                - firefox
-                - webkit
+                  - chromium
+                  - firefox
+                  - webkit
 
   commands:
-
     zip:
       internal: true
       parameters:
@@ -664,10 +649,10 @@ LocalUtils:
         action:
           type: enum
           literals:
-          - error
-          - redirect
-          - fulfill
-          - noentry
+            - error
+            - redirect
+            - fulfill
+            - noentry
         message: string?
         redirectURL: string?
         status: int?
@@ -734,7 +719,6 @@ Root:
   type: interface
 
   commands:
-
     initialize:
       internal: true
       parameters:
@@ -790,8 +774,8 @@ Playwright:
             send:
               type: enum?
               literals:
-              - always
-              - unauthorized
+                - always
+                - unauthorized
         proxy:
           type: object?
           properties:
@@ -951,7 +935,6 @@ SocksSupport:
       parameters:
         uid: string
 
-
 BrowserType:
   type: interface
 
@@ -960,7 +943,6 @@ BrowserType:
     name: string
 
   commands:
-
     launch:
       title: Launch browser
       parameters:
@@ -1002,7 +984,6 @@ Browser:
     name: string
 
   commands:
-
     close:
       title: Close browser
       parameters:
@@ -1092,7 +1073,6 @@ Browser:
         artifact: Artifact
 
   events:
-
     context:
       parameters:
         context: BrowserContext
@@ -1114,7 +1094,6 @@ ConsoleMessage:
         lineNumber: int
         columnNumber: int
 
-
 EventTarget:
   type: interface
 
@@ -1129,9 +1108,9 @@ EventTarget:
             phase:
               type: enum
               literals:
-              - before
-              - after
-              - log
+                - before
+                - after
+                - log
             event: string?
             message: string?
             error: string?
@@ -1153,7 +1132,6 @@ BrowserContext:
         $mixin: ContextOptions
 
   commands:
-
     addCookies:
       title: Add cookies
       group: configuration
@@ -1319,13 +1297,14 @@ BrowserContext:
         mode:
           type: enum?
           literals:
-          - inspecting
-          - recording
+            - inspecting
+            - recording
         recorderMode:
           type: enum?
           literals:
-          - default
-          - api
+            - default
+            - api
+            - programmatic
         pauseOnNextStatement: boolean?
         testIdAttributeName: string?
         launchOptions: json?
@@ -1338,9 +1317,18 @@ BrowserContext:
         # CUSTOMIZATION: Custom recorder UI settings (highlightCSS, highlightColors, elementFactories)
         # See packages/injected/src/recorder/recorderElementFactories.ts for schema
         customization: json?
+        # When recorderMode is 'programmatic', optionally show the side window for debugging.
+        # Both the programmatic API and side window can communicate with the injected script simultaneously.
+        showSidePanel: boolean?
 
     disableRecorder:
       internal: true
+
+    sendRecorderCommand:
+      internal: true
+      parameters:
+        method: string
+        params: json?
 
     exposeConsoleApi:
       internal: true
@@ -1392,12 +1380,12 @@ BrowserContext:
         event:
           type: enum
           literals:
-          - console
-          - dialog
-          - request
-          - response
-          - requestFinished
-          - requestFailed
+            - console
+            - dialog
+            - request
+            - response
+            - requestFinished
+            - requestFailed
         enabled: boolean
 
     clockFastForward:
@@ -1440,7 +1428,6 @@ BrowserContext:
         timeString: string?
 
   events:
-
     bindingCall:
       parameters:
         binding: BindingCall
@@ -1511,11 +1498,17 @@ BrowserContext:
         event:
           type: enum
           literals:
-          - actionAdded
-          - actionUpdated
-          - signalAdded
+            - actionAdded
+            - actionUpdated
+            - signalAdded
+            - modeChanged
+            - pauseStateChanged
+            - sourcesUpdated
+            - pageNavigated
+            - elementPicked
+            - callLogsUpdated
         data: json
-        page: Page
+        page: Page?
         code: string
 
 Page:
@@ -1534,7 +1527,6 @@ Page:
     opener: Page?
 
   commands:
-
     addInitScript:
       title: Add init script
       group: configuration
@@ -1566,34 +1558,34 @@ Page:
         media:
           type: enum?
           literals:
-          - screen
-          - print
-          - no-override
+            - screen
+            - print
+            - no-override
         colorScheme:
           type: enum?
           literals:
-          - dark
-          - light
-          - no-preference
-          - no-override
+            - dark
+            - light
+            - no-preference
+            - no-override
         reducedMotion:
           type: enum?
           literals:
-          - reduce
-          - no-preference
-          - no-override
+            - reduce
+            - no-preference
+            - no-override
         forcedColors:
           type: enum?
           literals:
-          - active
-          - none
-          - no-override
+            - active
+            - none
+            - no-override
         contrast:
           type: enum?
           literals:
-          - no-preference
-          - more
-          - no-override
+            - no-preference
+            - more
+            - no-override
       flags:
         snapshot: true
         pausesBeforeAction: true
@@ -1702,8 +1694,8 @@ Page:
         type:
           type: enum?
           literals:
-          - png
-          - jpeg
+            - png
+            - jpeg
         quality: int?
         fullPage: boolean?
         clip: Rect?
@@ -1824,9 +1816,9 @@ Page:
         button:
           type: enum?
           literals:
-          - left
-          - right
-          - middle
+            - left
+            - right
+            - middle
         clickCount: int?
       flags:
         slowMo: true
@@ -1839,9 +1831,9 @@ Page:
         button:
           type: enum?
           literals:
-          - left
-          - right
-          - middle
+            - left
+            - right
+            - middle
         clickCount: int?
       flags:
         slowMo: true
@@ -1857,9 +1849,9 @@ Page:
         button:
           type: enum?
           literals:
-          - left
-          - right
-          - middle
+            - left
+            - right
+            - middle
         clickCount: int?
       flags:
         slowMo: true
@@ -2007,13 +1999,13 @@ Page:
         event:
           type: enum
           literals:
-          - console
-          - dialog
-          - fileChooser
-          - request
-          - response
-          - requestFinished
-          - requestFailed
+            - console
+            - dialog
+            - fileChooser
+            - request
+            - response
+            - requestFinished
+            - requestFailed
         enabled: boolean
 
     agent:
@@ -2038,7 +2030,6 @@ Page:
         agent: PageAgent
 
   events:
-
     bindingCall:
       parameters:
         binding: BindingCall
@@ -2098,8 +2089,6 @@ Page:
       parameters:
         worker: Worker
 
-
-
 Frame:
   type: interface
 
@@ -2112,7 +2101,6 @@ Frame:
       items: LifecycleEvent
 
   commands:
-
     evalOnSelector:
       title: Evaluate
       parameters:
@@ -2211,19 +2199,19 @@ Frame:
           items:
             type: enum
             literals:
-            - Alt
-            - Control
-            - ControlOrMeta
-            - Meta
-            - Shift
+              - Alt
+              - Control
+              - ControlOrMeta
+              - Meta
+              - Shift
         position: Point?
         delay: float?
         button:
           type: enum?
           literals:
-          - left
-          - right
-          - middle
+            - left
+            - right
+            - middle
         clickCount: int?
         timeout: float
         trial: boolean?
@@ -2269,19 +2257,19 @@ Frame:
           items:
             type: enum
             literals:
-            - Alt
-            - Control
-            - ControlOrMeta
-            - Meta
-            - Shift
+              - Alt
+              - Control
+              - ControlOrMeta
+              - Meta
+              - Shift
         position: Point?
         delay: float?
         button:
           type: enum?
           literals:
-          - left
-          - right
-          - middle
+            - left
+            - right
+            - middle
         timeout: float
         trial: boolean?
         steps: int?
@@ -2409,11 +2397,11 @@ Frame:
           items:
             type: enum
             literals:
-            - Alt
-            - Control
-            - ControlOrMeta
-            - Meta
-            - Shift
+              - Alt
+              - Control
+              - ControlOrMeta
+              - Meta
+              - Shift
         position: Point?
         timeout: float
         trial: boolean?
@@ -2661,11 +2649,11 @@ Frame:
           items:
             type: enum
             literals:
-            - Alt
-            - Control
-            - ControlOrMeta
-            - Meta
-            - Shift
+              - Alt
+              - Control
+              - ControlOrMeta
+              - Meta
+              - Shift
         position: Point?
         timeout: float
         trial: boolean?
@@ -2751,10 +2739,10 @@ Frame:
         state:
           type: enum?
           literals:
-          - attached
-          - detached
-          - visible
-          - hidden
+            - attached
+            - detached
+            - visible
+            - hidden
         omitReturnValue: boolean?
       returns:
         element: ElementHandle?
@@ -2788,7 +2776,6 @@ Frame:
         pausesBeforeAction: true
 
   events:
-
     loadstate:
       parameters:
         add: LifecycleEvent?
@@ -2804,8 +2791,6 @@ Frame:
             request: Request?
         error: string?
 
-
-
 Worker:
   type: interface
 
@@ -2815,7 +2800,6 @@ Worker:
     url: string
 
   commands:
-
     evaluateExpression:
       title: Evaluate
       parameters:
@@ -2840,13 +2824,11 @@ Worker:
         event:
           type: enum
           literals:
-          - console
+            - console
         enabled: boolean
 
   events:
-
     close:
-
 
 JSHandle:
   type: interface
@@ -2855,7 +2837,6 @@ JSHandle:
     preview: string
 
   commands:
-
     dispose:
       internal: true
 
@@ -2910,12 +2891,9 @@ JSHandle:
         value: SerializedValue
 
   events:
-
     previewUpdated:
       parameters:
         preview: string
-
-
 
 ElementHandle:
   type: interface
@@ -2923,7 +2901,6 @@ ElementHandle:
   extends: JSHandle
 
   commands:
-
     evalOnSelector:
       title: Evaluate
       parameters:
@@ -2981,19 +2958,19 @@ ElementHandle:
           items:
             type: enum
             literals:
-            - Alt
-            - Control
-            - ControlOrMeta
-            - Meta
-            - Shift
+              - Alt
+              - Control
+              - ControlOrMeta
+              - Meta
+              - Shift
         position: Point?
         delay: float?
         button:
           type: enum?
           literals:
-          - left
-          - right
-          - middle
+            - left
+            - right
+            - middle
         clickCount: int?
         timeout: float
         trial: boolean?
@@ -3018,19 +2995,19 @@ ElementHandle:
           items:
             type: enum
             literals:
-            - Alt
-            - Control
-            - ControlOrMeta
-            - Meta
-            - Shift
+              - Alt
+              - Control
+              - ControlOrMeta
+              - Meta
+              - Shift
         position: Point?
         delay: float?
         button:
           type: enum?
           literals:
-          - left
-          - right
-          - middle
+            - left
+            - right
+            - middle
         timeout: float
         trial: boolean?
         steps: int?
@@ -3087,11 +3064,11 @@ ElementHandle:
           items:
             type: enum
             literals:
-            - Alt
-            - Control
-            - ControlOrMeta
-            - Meta
-            - Shift
+              - Alt
+              - Control
+              - ControlOrMeta
+              - Meta
+              - Shift
         position: Point?
         timeout: float
         trial: boolean?
@@ -3227,8 +3204,8 @@ ElementHandle:
         type:
           type: enum?
           literals:
-          - png
-          - jpeg
+            - png
+            - jpeg
         quality: int?
         $mixin: CommonScreenshotOptions
       returns:
@@ -3317,11 +3294,11 @@ ElementHandle:
           items:
             type: enum
             literals:
-            - Alt
-            - Control
-            - ControlOrMeta
-            - Meta
-            - Shift
+              - Alt
+              - Control
+              - ControlOrMeta
+              - Meta
+              - Shift
         position: Point?
         timeout: float
         trial: boolean?
@@ -3368,12 +3345,12 @@ ElementHandle:
         state:
           type: enum
           literals:
-          - visible
-          - hidden
-          - stable
-          - enabled
-          - disabled
-          - editable
+            - visible
+            - hidden
+            - stable
+            - enabled
+            - disabled
+            - editable
         timeout: float
       flags:
         snapshot: true
@@ -3388,15 +3365,14 @@ ElementHandle:
         state:
           type: enum?
           literals:
-          - attached
-          - detached
-          - visible
-          - hidden
+            - attached
+            - detached
+            - visible
+            - hidden
       returns:
         element: ElementHandle?
       flags:
         snapshot: true
-
 
 Request:
   type: interface
@@ -3416,7 +3392,6 @@ Request:
     hasResponse: boolean
 
   commands:
-
     response:
       internal: true
       returns:
@@ -3439,7 +3414,6 @@ Route:
     request: Request
 
   commands:
-
     redirectNavigationRequest:
       internal: true
       parameters:
@@ -3476,7 +3450,6 @@ Route:
         isBase64: boolean?
         fetchResponseUid: string?
 
-
 WebSocketRoute:
   type: interface
 
@@ -3484,7 +3457,6 @@ WebSocketRoute:
     url: string
 
   commands:
-
     connect:
       title: Connect WebSocket to server
       group: route
@@ -3521,7 +3493,6 @@ WebSocketRoute:
         wasClean: boolean
 
   events:
-
     messageFromPage:
       parameters:
         message: string
@@ -3543,7 +3514,6 @@ WebSocketRoute:
         code: int?
         reason: string?
         wasClean: boolean
-
 
 ResourceTiming:
   type: object
@@ -3571,9 +3541,7 @@ Response:
     timing: ResourceTiming
     fromServiceWorker: boolean
 
-
   commands:
-
     body:
       title: Get response body
       group: getter
@@ -3602,7 +3570,6 @@ Response:
       returns:
         sizes: RequestSizes
 
-
 SecurityDetails:
   type: object
   properties:
@@ -3620,13 +3587,11 @@ RequestSizes:
     responseBodySize: int
     responseHeadersSize: int
 
-
 RemoteAddr:
   type: object
   properties:
     ipAddress: string
     port: int
-
 
 WebSocket:
   type: interface
@@ -3655,7 +3620,6 @@ WebSocket:
 
     close:
 
-
 BindingCall:
   type: interface
 
@@ -3668,7 +3632,6 @@ BindingCall:
     handle: JSHandle?
 
   commands:
-
     reject:
       internal: true
       parameters:
@@ -3678,8 +3641,6 @@ BindingCall:
       internal: true
       parameters:
         result: SerializedArgument
-
-
 
 Dialog:
   type: interface
@@ -3691,7 +3652,6 @@ Dialog:
     defaultValue: string
 
   commands:
-
     accept:
       title: Accept dialog
       parameters:
@@ -3704,7 +3664,6 @@ Tracing:
   type: interface
 
   commands:
-
     tracingStart:
       title: Start tracing
       group: configuration
@@ -3744,9 +3703,9 @@ Tracing:
         mode:
           type: enum
           literals:
-          - archive
-          - discard
-          - entries
+            - archive
+            - discard
+            - entries
       returns:
         # The artifact may be missing if the browser closes while tracing is being stopped.
         # Or it can be missing if client-side compression is taking place.
@@ -3760,7 +3719,6 @@ Tracing:
       title: Stop tracing
       group: configuration
 
-
 Artifact:
   type: interface
 
@@ -3768,7 +3726,6 @@ Artifact:
     absolutePath: string
 
   commands:
-
     pathAfterFinished:
       internal: true
       returns:
@@ -3802,12 +3759,10 @@ Artifact:
     delete:
       internal: true
 
-
 Stream:
   type: interface
 
   commands:
-
     read:
       internal: true
       parameters:
@@ -3818,12 +3773,10 @@ Stream:
     close:
       internal: true
 
-
 WritableStream:
   type: interface
 
   commands:
-
     write:
       internal: true
       parameters:
@@ -3832,12 +3785,10 @@ WritableStream:
     close:
       internal: true
 
-
 CDPSession:
   type: interface
 
   commands:
-
     send:
       title: Send CDP command
       group: configuration
@@ -3852,18 +3803,15 @@ CDPSession:
       group: configuration
 
   events:
-
     event:
       parameters:
         method: string
         params: json?
 
-
 Electron:
   type: interface
 
   commands:
-
     launch:
       title: Launch electron
       parameters:
@@ -3879,17 +3827,17 @@ Electron:
         acceptDownloads:
           type: enum?
           literals:
-          - accept
-          - deny
-          - internal-browser-default
+            - accept
+            - deny
+            - internal-browser-default
         bypassCSP: boolean?
         colorScheme:
           type: enum?
           literals:
-          - dark
-          - light
-          - no-preference
-          - no-override
+            - dark
+            - light
+            - no-preference
+            - no-override
         extraHTTPHeaders:
           type: array?
           items: NameValue
@@ -3928,7 +3876,6 @@ Electron:
       returns:
         electronApplication: ElectronApplication
 
-
 ElectronApplication:
   type: interface
 
@@ -3938,7 +3885,6 @@ ElectronApplication:
     context: BrowserContext
 
   commands:
-
     browserWindow:
       internal: true
       parameters:
@@ -3970,7 +3916,7 @@ ElectronApplication:
         event:
           type: enum
           literals:
-          - console
+            - console
         enabled: boolean
 
   events:
@@ -3983,7 +3929,6 @@ Android:
   type: interface
 
   commands:
-
     devices:
       internal: true
       parameters:
@@ -4030,7 +3975,7 @@ AndroidDevice:
         state:
           type: enum?
           literals:
-          - gone
+            - gone
         timeout: float
 
     fill:
@@ -4062,10 +4007,10 @@ AndroidDevice:
         direction:
           type: enum
           literals:
-          - up
-          - down
-          - left
-          - right
+            - up
+            - down
+            - left
+            - right
         speed: float?
         timeout: float
 
@@ -4098,10 +4043,10 @@ AndroidDevice:
         direction:
           type: enum
           literals:
-          - up
-          - down
-          - left
-          - right
+            - up
+            - down
+            - left
+            - right
         percent: float
         speed: float?
         timeout: float
@@ -4113,10 +4058,10 @@ AndroidDevice:
         direction:
           type: enum
           literals:
-          - up
-          - down
-          - left
-          - right
+            - up
+            - down
+            - left
+            - right
         percent: float
         speed: float?
         timeout: float
@@ -4233,14 +4178,12 @@ AndroidDevice:
       parameters:
         socketName: string
 
-
 AndroidWebView:
   type: object
   properties:
     pid: int
     pkg: string
     socketName: string
-
 
 AndroidSelector:
   type: object
@@ -4270,7 +4213,6 @@ AndroidSelector:
     selected: boolean?
     text: string?
 
-
 AndroidElementInfo:
   type: object
   properties:
@@ -4293,7 +4235,6 @@ AndroidElementInfo:
     scrollable: boolean
     selected: boolean
 
-
 JsonPipe:
   type: interface
 
@@ -4307,7 +4248,6 @@ JsonPipe:
       internal: true
 
   events:
-
     message:
       parameters:
         message: json
@@ -4315,7 +4255,6 @@ JsonPipe:
     closed:
       parameters:
         reason: string?
-
 
 PageAgent:
   type: interface
@@ -4358,13 +4297,12 @@ PageAgent:
       internal: true
 
     usage:
-      title: 'Get agent usage'
+      title: "Get agent usage"
       group: configuration
       returns:
         usage: AgentUsage
 
   events:
-
     turn:
       parameters:
         role: string
@@ -4374,7 +4312,6 @@ PageAgent:
           properties:
             inputTokens: int
             outputTokens: int
-
 
 PageAgentOptions:
   type: mixin

@@ -184,6 +184,16 @@ export class RecorderApp {
       await ProgrammaticRecorderApp.run(context, recorder, browserName, params);
       return;
     }
+    if (params.recorderMode === 'programmatic') {
+      const browserName = context._browser.options.name;
+      await FullProgrammaticRecorderApp.run(context, recorder, browserName, params);
+      // If showSidePanel is true, also show the side window for debugging
+      // Both programmatic API and side window can communicate with injected script simultaneously
+      if (params.showSidePanel) {
+        await RecorderApp._show(recorder, context, params);
+      }
+      return;
+    }
     await RecorderApp._show(recorder, context, params);
   }
 
@@ -352,37 +362,102 @@ function determinePrimaryGeneratorId(sdkLanguage: Language): string {
   return sdkLanguage;
 }
 
+/**
+ * Helper to wire action/signal event handlers from Recorder to BrowserContext.
+ * Shared by ProgrammaticRecorderApp and FullProgrammaticRecorderApp.
+ */
+function wireActionSignalEvents(
+  inspectedContext: BrowserContext,
+  recorder: Recorder,
+  browserName: string,
+  params: channels.BrowserContextEnableRecorderParams
+) {
+  let lastAction: actions.ActionInContext | null = null;
+  const languages = [...languageSet()];
+
+  const languageGeneratorOptions = {
+    browserName: browserName,
+    launchOptions: { headless: false, ...params.launchOptions, tracesDir: undefined },
+    contextOptions: { ...params.contextOptions },
+    deviceName: params.device,
+    saveStorage: params.saveStorage,
+  };
+  const languageGenerator = languages.find(l => l.id === params.language) ?? languages.find(l => l.id === 'playwright-test')!;
+
+  recorder.on(RecorderEvent.ActionAdded, action => {
+    const page = findPageByGuid(inspectedContext, action.frame.pageGuid);
+    if (!page)
+      return;
+    const { actionTexts } = generateCode([action], languageGenerator, languageGeneratorOptions);
+    if (!lastAction || !shouldMergeAction(action, lastAction))
+      inspectedContext.emit(BrowserContext.Events.RecorderEvent, { event: 'actionAdded', data: action, page, code: actionTexts.join('\n') });
+    else
+      inspectedContext.emit(BrowserContext.Events.RecorderEvent, { event: 'actionUpdated', data: action, page, code: actionTexts.join('\n') });
+    lastAction = action;
+  });
+
+  recorder.on(RecorderEvent.SignalAdded, signal => {
+    const page = findPageByGuid(inspectedContext, signal.frame.pageGuid);
+    if (!page)
+      return;
+    inspectedContext.emit(BrowserContext.Events.RecorderEvent, { event: 'signalAdded', data: signal, page, code: '' });
+  });
+}
+
 export class ProgrammaticRecorderApp {
   static async run(inspectedContext: BrowserContext, recorder: Recorder, browserName: string, params: channels.BrowserContextEnableRecorderParams) {
-    let lastAction: actions.ActionInContext | null = null;
-    const languages = [...languageSet()];
+    wireActionSignalEvents(inspectedContext, recorder, browserName, params);
+  }
+}
 
-    const languageGeneratorOptions = {
-      browserName: browserName,
-      launchOptions: { headless: false, ...params.launchOptions, tracesDir: undefined },
-      contextOptions: { ...params.contextOptions },
-      deviceName: params.device,
-      saveStorage: params.saveStorage,
-    };
-    const languageGenerator = languages.find(l => l.id === params.language) ?? languages.find(l => l.id === 'playwright-test')!;
+/**
+ * FullProgrammaticRecorderApp: Provides full bidirectional communication with the recorder
+ * without opening a separate side window. This mode:
+ * - Keeps the full recorder UI (overlay, highlights) in the browser
+ * - Emits ALL recorder events to BrowserContext.Events.RecorderEvent
+ * - Allows commands via context._sendRecorderCommand()
+ *
+ * Use this mode when you want to control the recorder programmatically while
+ * still having the full in-browser recording experience.
+ */
+export class FullProgrammaticRecorderApp {
+  static async run(inspectedContext: BrowserContext, recorder: Recorder, browserName: string, params: channels.BrowserContextEnableRecorderParams) {
+    // Mark context to prevent side window from being opened by other code paths,
+    // unless showSidePanel is true (for debugging alongside programmatic API)
+    if (!params.showSidePanel)
+      (inspectedContext as any)[recorderAppSymbol] = true;
 
-    recorder.on(RecorderEvent.ActionAdded, action => {
-      const page = findPageByGuid(inspectedContext, action.frame.pageGuid);
-      if (!page)
-        return;
-      const { actionTexts } = generateCode([action], languageGenerator, languageGeneratorOptions);
-      if (!lastAction || !shouldMergeAction(action, lastAction))
-        inspectedContext.emit(BrowserContext.Events.RecorderEvent, { event: 'actionAdded', data: action, page, code: actionTexts.join('\n') });
-      else
-        inspectedContext.emit(BrowserContext.Events.RecorderEvent, { event: 'actionUpdated', data: action, page, code: actionTexts.join('\n') });
-      lastAction = action;
+    // Wire action/signal events (shared with ProgrammaticRecorderApp)
+    wireActionSignalEvents(inspectedContext, recorder, browserName, params);
+
+    // Frontend events (additional events for full programmatic mode)
+    recorder.on(RecorderEvent.ModeChanged, (mode: Mode) => {
+      inspectedContext.emit(BrowserContext.Events.RecorderEvent, { event: 'modeChanged', data: { mode }, page: null, code: '' });
     });
-    recorder.on(RecorderEvent.SignalAdded, signal => {
-      const page = findPageByGuid(inspectedContext, signal.frame.pageGuid);
-      if (!page)
-        return;
-      inspectedContext.emit(BrowserContext.Events.RecorderEvent, { event: 'signalAdded', data: signal, page, code: '' });
+
+    recorder.on(RecorderEvent.PausedStateChanged, (paused: boolean) => {
+      inspectedContext.emit(BrowserContext.Events.RecorderEvent, { event: 'pauseStateChanged', data: { paused }, page: null, code: '' });
     });
+
+    recorder.on(RecorderEvent.UserSourcesChanged, (sources: Source[], pausedSourceId?: string) => {
+      inspectedContext.emit(BrowserContext.Events.RecorderEvent, { event: 'sourcesUpdated', data: { sources, pausedSourceId }, page: null, code: '' });
+    });
+
+    recorder.on(RecorderEvent.PageNavigated, (url: string) => {
+      inspectedContext.emit(BrowserContext.Events.RecorderEvent, { event: 'pageNavigated', data: { url }, page: null, code: '' });
+    });
+
+    recorder.on(RecorderEvent.ElementPicked, (elementInfo: ElementInfo, userGesture?: boolean) => {
+      inspectedContext.emit(BrowserContext.Events.RecorderEvent, { event: 'elementPicked', data: { elementInfo, userGesture }, page: null, code: '' });
+    });
+
+    recorder.on(RecorderEvent.CallLogsUpdated, (callLogs: CallLog[]) => {
+      inspectedContext.emit(BrowserContext.Events.RecorderEvent, { event: 'callLogsUpdated', data: { callLogs }, page: null, code: '' });
+    });
+
+    // Emit initial state
+    inspectedContext.emit(BrowserContext.Events.RecorderEvent, { event: 'modeChanged', data: { mode: recorder.mode() }, page: null, code: '' });
+    inspectedContext.emit(BrowserContext.Events.RecorderEvent, { event: 'pauseStateChanged', data: { paused: recorder.paused() }, page: null, code: '' });
   }
 }
 

@@ -48,11 +48,20 @@ import type { URLMatch } from '../utils/isomorphic/urlMatch';
 import type { Platform } from './platform';
 import type * as channels from '@protocol/channels';
 import type * as actions from '@recorder/actions';
+import type { Mode, Source, ElementInfo, CallLog } from '@recorder/recorderTypes';
 
 interface RecorderEventSink {
+  // Existing action events
   actionAdded?(page: Page, actionInContext: actions.ActionInContext, code: string): void;
   actionUpdated?(page: Page, actionInContext: actions.ActionInContext, code: string): void;
   signalAdded?(page: Page, signal: actions.SignalInContext): void;
+  // Frontend events (for programmatic mode)
+  modeChanged?(mode: Mode): void;
+  pauseStateChanged?(paused: boolean): void;
+  sourcesUpdated?(sources: Source[]): void;
+  pageNavigated?(url: string | undefined): void;
+  elementPicked?(elementInfo: ElementInfo, userGesture?: boolean): void;
+  callLogsUpdated?(callLogs: CallLog[]): void;
 }
 
 export class BrowserContext extends ChannelOwner<channels.BrowserContextChannel> implements api.BrowserContext {
@@ -154,12 +163,35 @@ export class BrowserContext extends ChannelOwner<channels.BrowserContextChannel>
     this._channel.on('requestFinished', params => this._onRequestFinished(params));
     this._channel.on('response', ({ response, page }) => this._onResponse(network.Response.from(response), Page.fromNullable(page)));
     this._channel.on('recorderEvent', ({ event, data, page, code }) => {
-      if (event === 'actionAdded')
-        this._onRecorderEventSink?.actionAdded?.(Page.from(page), data as actions.ActionInContext, code);
-      else if (event === 'actionUpdated')
-        this._onRecorderEventSink?.actionUpdated?.(Page.from(page), data as actions.ActionInContext, code);
-      else if (event === 'signalAdded')
-        this._onRecorderEventSink?.signalAdded?.(Page.from(page), data as actions.SignalInContext);
+      switch (event) {
+        case 'actionAdded':
+          this._onRecorderEventSink?.actionAdded?.(Page.from(page!), data as actions.ActionInContext, code);
+          break;
+        case 'actionUpdated':
+          this._onRecorderEventSink?.actionUpdated?.(Page.from(page!), data as actions.ActionInContext, code);
+          break;
+        case 'signalAdded':
+          this._onRecorderEventSink?.signalAdded?.(Page.from(page!), data as actions.SignalInContext);
+          break;
+        case 'modeChanged':
+          this._onRecorderEventSink?.modeChanged?.(data.mode);
+          break;
+        case 'pauseStateChanged':
+          this._onRecorderEventSink?.pauseStateChanged?.(data.paused);
+          break;
+        case 'sourcesUpdated':
+          this._onRecorderEventSink?.sourcesUpdated?.(data.sources);
+          break;
+        case 'pageNavigated':
+          this._onRecorderEventSink?.pageNavigated?.(data.url);
+          break;
+        case 'elementPicked':
+          this._onRecorderEventSink?.elementPicked?.(data.elementInfo, data.userGesture);
+          break;
+        case 'callLogsUpdated':
+          this._onRecorderEventSink?.callLogsUpdated?.(data.callLogs);
+          break;
+      }
     });
     this._closedPromise = new Promise(f => this.once(Events.BrowserContext.Close, f));
 
@@ -540,6 +572,10 @@ export class BrowserContext extends ChannelOwner<channels.BrowserContextChannel>
   async _disableRecorder() {
     this._onRecorderEventSink = undefined;
     await this._channel.disableRecorder();
+  }
+
+  async _sendRecorderCommand(method: string, params?: any) {
+    await this._channel.sendRecorderCommand({ method, params });
   }
 
   async _exposeConsoleApi() {

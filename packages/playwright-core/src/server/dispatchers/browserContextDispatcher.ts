@@ -190,8 +190,8 @@ export class BrowserContextDispatcher extends Dispatcher<BrowserContext, channel
         page: PageDispatcher.fromNullable(this, request.frame()?._page.initializedOrUndefined()),
       });
     });
-    this.addObjectListener(BrowserContext.Events.RecorderEvent, ({ event, data, page, code }: { event: 'actionAdded' | 'actionUpdated' | 'signalAdded', data: any, page: Page, code: string }) => {
-      this._dispatchEvent('recorderEvent', { event, data, code, page: PageDispatcher.from(this, page) });
+    this.addObjectListener(BrowserContext.Events.RecorderEvent, ({ event, data, page, code }: { event: string, data: any, page: Page | null, code: string }) => {
+      this._dispatchEvent('recorderEvent', { event, data, code, page: page ? PageDispatcher.from(this, page) : undefined });
     });
   }
 
@@ -347,6 +347,13 @@ export class BrowserContextDispatcher extends Dispatcher<BrowserContext, channel
     const recorder = await Recorder.existingForContext(this._context);
     if (recorder)
       recorder.setMode('none');
+  }
+
+  async sendRecorderCommand(params: channels.BrowserContextSendRecorderCommandParams, progress: Progress): Promise<void> {
+    const recorder = await Recorder.existingForContext(this._context);
+    if (!recorder)
+      throw new Error('Recorder is not enabled. Call enableRecorder first.');
+    await recorder.handleCommand(params.method, params.params);
   }
 
   async exposeConsoleApi(params: channels.BrowserContextExposeConsoleApiParams, progress: Progress): Promise<void> {

@@ -945,9 +945,9 @@ scheme.BrowserContextResponseEvent = tObject({
   page: tOptional(tChannel(['Page'])),
 });
 scheme.BrowserContextRecorderEventEvent = tObject({
-  event: tEnum(['actionAdded', 'actionUpdated', 'signalAdded']),
+  event: tEnum(['actionAdded', 'actionUpdated', 'signalAdded', 'modeChanged', 'pauseStateChanged', 'sourcesUpdated', 'pageNavigated', 'elementPicked', 'callLogsUpdated']),
   data: tAny,
-  page: tChannel(['Page']),
+  page: tOptional(tChannel(['Page'])),
   code: tString,
 });
 scheme.BrowserContextAddCookiesParams = tObject({
@@ -1056,7 +1056,7 @@ scheme.BrowserContextPauseResult = tOptional(tObject({}));
 scheme.BrowserContextEnableRecorderParams = tObject({
   language: tOptional(tString),
   mode: tOptional(tEnum(['inspecting', 'recording'])),
-  recorderMode: tOptional(tEnum(['default', 'api'])),
+  recorderMode: tOptional(tEnum(['default', 'api', 'programmatic'])),
   pauseOnNextStatement: tOptional(tBoolean),
   testIdAttributeName: tOptional(tString),
   launchOptions: tOptional(tAny),
@@ -1067,10 +1067,16 @@ scheme.BrowserContextEnableRecorderParams = tObject({
   handleSIGINT: tOptional(tBoolean),
   omitCallTracking: tOptional(tBoolean),
   customization: tOptional(tAny),
+  showSidePanel: tOptional(tBoolean),
 });
 scheme.BrowserContextEnableRecorderResult = tOptional(tObject({}));
 scheme.BrowserContextDisableRecorderParams = tOptional(tObject({}));
 scheme.BrowserContextDisableRecorderResult = tOptional(tObject({}));
+scheme.BrowserContextSendRecorderCommandParams = tObject({
+  method: tString,
+  params: tOptional(tAny),
+});
+scheme.BrowserContextSendRecorderCommandResult = tOptional(tObject({}));
 scheme.BrowserContextExposeConsoleApiParams = tOptional(tObject({}));
 scheme.BrowserContextExposeConsoleApiResult = tOptional(tObject({}));
 scheme.BrowserContextNewCDPSessionParams = tObject({
