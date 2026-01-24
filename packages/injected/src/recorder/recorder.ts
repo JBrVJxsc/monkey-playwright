@@ -806,7 +806,7 @@ class JsonRecordActionTool implements RecorderTool {
   }
 
   install() {
-    // No highlight for the lightweight recorder.
+    // In pure API mode, uninstall highlight for performance (no visual feedback needed)
     this._recorder.highlight.uninstall();
   }
 
@@ -1523,6 +1523,9 @@ class Overlay {
   private _showOverlay() {
     if (!this._overlayElement.hasAttribute("hidden")) return;
     this._overlayElement.removeAttribute("hidden");
+    // Force layout reflow so getBoundingClientRect() returns correct dimensions.
+    // Without this, the element may still report width=0 immediately after unhiding.
+    void this._overlayElement.offsetWidth;
     this._updateVisualPosition();
   }
 
@@ -1609,11 +1612,9 @@ export class Recorder {
     this.document = injectedScript.document;
     this.injectedScript = injectedScript;
     this.highlight = injectedScript.createHighlight();
-    // For 'api' and 'programmatic' modes, use JsonRecordActionTool (lightweight, automated)
-    // For 'default' mode, use RecordActionTool (full UI interaction)
-    const useJsonRecorder =
-      options?.recorderMode === "api" ||
-      options?.recorderMode === "programmatic";
+    // For pure 'api' mode, use JsonRecordActionTool (lightweight, no hover highlights)
+    // For 'programmatic' and 'default' modes, use RecordActionTool (full UI interaction with hover highlights)
+    const useJsonRecorder = options?.recorderMode === "api";
     this._tools = {
       none: new NoneTool(),
       standby: new NoneTool(),

@@ -355,4 +355,57 @@ test.describe("Programmatic Recorder API", () => {
     // Side panel should also be opened (recorderAppForTest is set when side window opens)
     expect(toImpl(context).recorderAppForTest).toBeTruthy();
   });
+
+  test("programmatic mode should keep highlight installed for hover functionality", async ({
+    context,
+  }) => {
+    // This test verifies that programmatic mode uses RecordActionTool (not JsonRecordActionTool).
+    // RecordActionTool does NOT uninstall highlight, so the glass pane remains in DOM.
+    // This is the key difference: programmatic mode supports hover highlights.
+    await startProgrammaticRecording(context);
+    const page = await context.newPage();
+    await page.setContent(`<button id="hoverBtn">Hover me</button>`);
+
+    // Wait for recorder to be ready - glass pane should be present and stay present
+    await page.waitForFunction(() => {
+      return document.querySelector("x-pw-glass") !== null;
+    });
+
+    // In programmatic mode with RecordActionTool, the highlight should remain installed
+    // (JsonRecordActionTool.install() would call highlight.uninstall() removing the glass pane)
+    const highlightInstalled = await page.evaluate(() => {
+      const glass = document.querySelector("x-pw-glass");
+      // If glass exists and is in the DOM, highlight is installed
+      return glass !== null && document.documentElement.contains(glass);
+    });
+    expect(highlightInstalled).toBe(true);
+  });
+
+  test("API mode should uninstall highlight for performance", async ({
+    context,
+  }) => {
+    // This test verifies that pure API mode uses JsonRecordActionTool
+    // which uninstalls highlight for performance (no visual feedback needed).
+    const log = new ProgrammaticRecorderLog();
+    await (context as any)._enableRecorder(
+      {
+        mode: "recording",
+        recorderMode: "api",
+      },
+      log,
+    );
+    const page = await context.newPage();
+    await page.setContent(`<button id="noHoverBtn">No hover</button>`);
+
+    // In API mode, JsonRecordActionTool.install() calls highlight.uninstall()
+    // which removes the glass pane from DOM
+    await page.waitForTimeout(100); // Give time for recorder to initialize
+
+    // Verify glass pane is not in DOM (highlight uninstalled)
+    const glassInDom = await page.evaluate(() => {
+      const glass = document.querySelector("x-pw-glass");
+      return glass !== null && document.documentElement.contains(glass);
+    });
+    expect(glassInDom).toBe(false);
+  });
 });
