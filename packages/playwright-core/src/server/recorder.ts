@@ -23,6 +23,8 @@ import { Debugger } from './debugger';
 import { buildFullSelector, generateFrameSelector, metadataToCallLog } from './recorder/recorderUtils';
 import { locatorOrSelectorAsSelector } from '../utils/isomorphic/locatorParser';
 import { stringifySelector } from '../utils/isomorphic/selectorParser';
+import { parseAriaSnapshot } from '../utils/isomorphic/ariaSnapshot';
+import { yaml } from '../utilsBundle';
 import { ProgressController } from './progress';
 import { RecorderSignalProcessor } from './recorder/recorderSignalProcessor';
 import * as rawRecorderSource from './../generated/pollingRecorderSource';
@@ -225,6 +227,21 @@ export class Recorder extends EventEmitter<RecorderEventMap> implements Instrume
       await this._context.exposeBinding(progress, '__pw_recorderRecordAction', false,
           (source: BindingSource, action: actions.Action) => this._recordAction(source.frame, action));
 
+      // Parse aria template text and return the parsed AriaTemplateNode.
+      // This allows the injected script to use aria search without bundling yaml.
+      await this._context.exposeBinding(progress, '__pw_parseAriaTemplate', false,
+          (_source: BindingSource, text: string): { fragment: AriaTemplateNode | null; error: string | null } => {
+            try {
+              const result = parseAriaSnapshot(yaml, text, { prettyErrors: false });
+              if (result.errors.length > 0) {
+                return { fragment: null, error: result.errors[0].message };
+              }
+              return { fragment: result.fragment, error: null };
+            } catch (e) {
+              return { fragment: null, error: String(e) };
+            }
+          });
+
       /**
        * CUSTOMIZATION: Pass customization options to the injected recorder script.
        * The customization object (highlightCSS, highlightColors, elementFactories)
@@ -336,7 +353,7 @@ export class Recorder extends EventEmitter<RecorderEventMap> implements Instrume
 
   /**
    * Handle commands from programmatic recorder API.
-   * This allows external callers (like monkey-react) to control the recorder
+   * This allows external callers to control the recorder
    * without using the side window UI.
    */
   async handleCommand(method: string, params?: any): Promise<void> {

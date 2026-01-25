@@ -47,6 +47,10 @@ interface Embedder {
   __pw_recorderSetMode(mode: Mode): Promise<void>;
   __pw_recorderSetOverlayState(state: OverlayState): Promise<void>;
   __pw_refreshOverlay(): void;
+  __pw_parseAriaTemplate(text: string): Promise<{
+    fragment: import("@isomorphic/ariaSnapshot").AriaTemplateNode | null;
+    error: string | null;
+  }>;
 }
 
 export class PollingRecorder implements RecorderDelegate {

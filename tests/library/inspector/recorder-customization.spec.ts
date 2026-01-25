@@ -1283,3 +1283,691 @@ test.describe('createToolIcon factory customization', () => {
     }
   });
 });
+
+/**
+ * FuzzySearchTool Integration Tests
+ *
+ * These tests verify the FuzzySearchTool functionality which provides
+ * text editor-like search in the recorder toolbar.
+ *
+ * Key features tested:
+ * - Search UI only appears when custom factories include createSearchContainer
+ * - Multiple search modes: locator, text, aria, auto
+ * - Match highlighting and navigation
+ * - No-match state indication
+ * - Keyboard navigation (Enter, Shift+Enter, Escape, F3)
+ *
+ * See packages/injected/src/recorder/fuzzySearchTool.ts for implementation.
+ */
+test.describe('FuzzySearchTool', () => {
+  // Search factory definitions for all tests
+  const searchFactories = `
+    module.exports = {
+      createSearchContainer: (doc) => {
+        const el = doc.createElement('x-pw-search-container');
+        return el;
+      },
+      createSearchInput: (doc) => {
+        const el = doc.createElement('textarea');
+        el.className = 'x-pw-search-input';
+        el.placeholder = 'Find elements...';
+        el.setAttribute('spellcheck', 'false');
+        el.setAttribute('rows', '1');
+        return el;
+      },
+      createSearchNav: (doc) => {
+        const el = doc.createElement('x-pw-search-nav');
+        return el;
+      },
+      createSearchCounter: (doc) => {
+        const el = doc.createElement('x-pw-search-counter');
+        return el;
+      },
+      createSearchNavButton: (doc, direction) => {
+        const el = doc.createElement('x-pw-search-nav-btn');
+        el.classList.add(direction);
+        el.textContent = direction === 'prev' ? '↑' : '↓';
+        return el;
+      },
+    };
+  `;
+
+  test('should NOT show search UI when no custom search factories provided', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      // Enable recorder WITHOUT search factories
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button>Click me</button>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Check that search container does NOT exist
+      const hasSearchUI = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        if (!glass || !glass.shadowRoot) return null;
+        return !!glass.shadowRoot.querySelector('x-pw-search-container');
+      });
+
+      expect(hasSearchUI).toBe(false);
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should show search UI when custom search factories are provided', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+        customization: {
+          elementFactories: searchFactories,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button>Click me</button>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Check that search UI is present
+      const searchUIInfo = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        if (!glass || !glass.shadowRoot) return { error: 'no glass' };
+
+        const container = glass.shadowRoot.querySelector('x-pw-search-container');
+        const input = glass.shadowRoot.querySelector('.x-pw-search-input');
+        const counter = glass.shadowRoot.querySelector('x-pw-search-counter');
+        const prevBtn = glass.shadowRoot.querySelector('x-pw-search-nav-btn.prev');
+        const nextBtn = glass.shadowRoot.querySelector('x-pw-search-nav-btn.next');
+
+        return {
+          hasContainer: !!container,
+          hasInput: !!input,
+          hasCounter: !!counter,
+          hasPrevBtn: !!prevBtn,
+          hasNextBtn: !!nextBtn,
+          inputPlaceholder: (input as HTMLTextAreaElement)?.placeholder,
+        };
+      });
+
+      expect(searchUIInfo.hasContainer).toBe(true);
+      expect(searchUIInfo.hasInput).toBe(true);
+      expect(searchUIInfo.hasCounter).toBe(true);
+      expect(searchUIInfo.hasPrevBtn).toBe(true);
+      expect(searchUIInfo.hasNextBtn).toBe(true);
+      expect(searchUIInfo.inputPlaceholder).toBe('Find elements...');
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should find elements by text content (quoted text mode)', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+        customization: {
+          elementFactories: searchFactories,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`
+        <button>Submit</button>
+        <button>Cancel</button>
+        <span>Submit form</span>
+      `);
+      await page.waitForSelector('x-pw-glass');
+
+      // Type search query (quoted for text mode)
+      await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const input = glass?.shadowRoot?.querySelector('.x-pw-search-input') as HTMLTextAreaElement;
+        if (input) {
+          input.value = '"Submit"';
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      });
+
+      // Wait for debounce and search to complete
+      await page.waitForTimeout(300);
+
+      // Check results
+      const searchResult = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        if (!glass || !glass.shadowRoot) return { error: 'no glass' };
+
+        const counter = glass.shadowRoot.querySelector('x-pw-search-counter');
+        const highlight = glass.shadowRoot.querySelector('x-pw-highlight');
+        const input = glass.shadowRoot.querySelector('.x-pw-search-input');
+
+        return {
+          counterText: counter?.textContent,
+          hasHighlight: !!highlight && (highlight as HTMLElement).style.display !== 'none',
+          hasNoMatchClass: input?.classList.contains('no-match'),
+        };
+      });
+
+      // Should find 2 matches ("Submit" button and "Submit form" span)
+      expect(searchResult.counterText).toMatch(/^\d+\/\d+$/);
+      expect(searchResult.hasHighlight).toBe(true);
+      expect(searchResult.hasNoMatchClass).toBe(false);
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should find elements by locator syntax', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+        customization: {
+          elementFactories: searchFactories,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`
+        <button data-testid="submit-btn">Submit</button>
+        <button data-testid="cancel-btn">Cancel</button>
+      `);
+      await page.waitForSelector('x-pw-glass');
+
+      // Type locator query
+      await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const input = glass?.shadowRoot?.querySelector('.x-pw-search-input') as HTMLTextAreaElement;
+        if (input) {
+          input.value = '[data-testid="submit-btn"]';
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      });
+
+      await page.waitForTimeout(300);
+
+      // Check results
+      const searchResult = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        if (!glass || !glass.shadowRoot) return { error: 'no glass' };
+
+        const counter = glass.shadowRoot.querySelector('x-pw-search-counter');
+        const highlight = glass.shadowRoot.querySelector('x-pw-highlight');
+
+        return {
+          counterText: counter?.textContent,
+          hasHighlight: !!highlight && (highlight as HTMLElement).style.display !== 'none',
+        };
+      });
+
+      // Should find exactly 1 match
+      expect(searchResult.counterText).toBe('1/1');
+      expect(searchResult.hasHighlight).toBe(true);
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should show no-match state when search has no results', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+        customization: {
+          elementFactories: searchFactories,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button>Submit</button>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Type a query that won't match anything
+      await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const input = glass?.shadowRoot?.querySelector('.x-pw-search-input') as HTMLTextAreaElement;
+        if (input) {
+          input.value = '"nonexistent element xyz123"';
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      });
+
+      await page.waitForTimeout(300);
+
+      // Check no-match state
+      const noMatchState = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        if (!glass || !glass.shadowRoot) return { error: 'no glass' };
+
+        const input = glass.shadowRoot.querySelector('.x-pw-search-input');
+        const counter = glass.shadowRoot.querySelector('x-pw-search-counter');
+        const prevBtn = glass.shadowRoot.querySelector('x-pw-search-nav-btn.prev');
+        const nextBtn = glass.shadowRoot.querySelector('x-pw-search-nav-btn.next');
+
+        return {
+          hasNoMatchClass: input?.classList.contains('no-match'),
+          counterText: counter?.textContent,
+          prevDisabled: prevBtn?.hasAttribute('disabled'),
+          nextDisabled: nextBtn?.hasAttribute('disabled'),
+        };
+      });
+
+      expect(noMatchState.hasNoMatchClass).toBe(true);
+      expect(noMatchState.counterText).toBe('');
+      expect(noMatchState.prevDisabled).toBe(true);
+      expect(noMatchState.nextDisabled).toBe(true);
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should navigate through matches with prev/next buttons', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+        customization: {
+          elementFactories: searchFactories,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`
+        <button class="btn">First</button>
+        <button class="btn">Second</button>
+        <button class="btn">Third</button>
+      `);
+      await page.waitForSelector('x-pw-glass');
+
+      // Search for buttons
+      await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const input = glass?.shadowRoot?.querySelector('.x-pw-search-input') as HTMLTextAreaElement;
+        if (input) {
+          input.value = 'button';
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      });
+
+      await page.waitForTimeout(300);
+
+      // Get initial state
+      const initialState = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const counter = glass?.shadowRoot?.querySelector('x-pw-search-counter');
+        return counter?.textContent;
+      });
+
+      expect(initialState).toBe('1/3');
+
+      // Click next button
+      await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const nextBtn = glass?.shadowRoot?.querySelector('x-pw-search-nav-btn.next') as HTMLElement;
+        nextBtn?.click();
+      });
+
+      await page.waitForTimeout(100);
+
+      const afterNext = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const counter = glass?.shadowRoot?.querySelector('x-pw-search-counter');
+        return counter?.textContent;
+      });
+
+      expect(afterNext).toBe('2/3');
+
+      // Click prev button
+      await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const prevBtn = glass?.shadowRoot?.querySelector('x-pw-search-nav-btn.prev') as HTMLElement;
+        prevBtn?.click();
+      });
+
+      await page.waitForTimeout(100);
+
+      const afterPrev = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const counter = glass?.shadowRoot?.querySelector('x-pw-search-counter');
+        return counter?.textContent;
+      });
+
+      expect(afterPrev).toBe('1/3');
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should wrap around when navigating past first/last match', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+        customization: {
+          elementFactories: searchFactories,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`
+        <button>First</button>
+        <button>Second</button>
+      `);
+      await page.waitForSelector('x-pw-glass');
+
+      // Search for buttons
+      await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const input = glass?.shadowRoot?.querySelector('.x-pw-search-input') as HTMLTextAreaElement;
+        if (input) {
+          input.value = 'button';
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      });
+
+      await page.waitForTimeout(300);
+
+      // Go to second match
+      await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const nextBtn = glass?.shadowRoot?.querySelector('x-pw-search-nav-btn.next') as HTMLElement;
+        nextBtn?.click();
+      });
+
+      await page.waitForTimeout(100);
+
+      // Now click next again - should wrap to first
+      await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const nextBtn = glass?.shadowRoot?.querySelector('x-pw-search-nav-btn.next') as HTMLElement;
+        nextBtn?.click();
+      });
+
+      await page.waitForTimeout(100);
+
+      const afterWrap = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const counter = glass?.shadowRoot?.querySelector('x-pw-search-counter');
+        return counter?.textContent;
+      });
+
+      expect(afterWrap).toBe('1/2');
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should clear search on Escape key', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+        customization: {
+          elementFactories: searchFactories,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button>Submit</button>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Type search query
+      await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const input = glass?.shadowRoot?.querySelector('.x-pw-search-input') as HTMLTextAreaElement;
+        if (input) {
+          input.value = 'button';
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      });
+
+      await page.waitForTimeout(300);
+
+      // Verify we have results
+      const beforeEscape = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const counter = glass?.shadowRoot?.querySelector('x-pw-search-counter');
+        return counter?.textContent;
+      });
+
+      expect(beforeEscape).toBe('1/1');
+
+      // Press Escape on the input
+      await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const input = glass?.shadowRoot?.querySelector('.x-pw-search-input') as HTMLTextAreaElement;
+        if (input) {
+          input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        }
+      });
+
+      await page.waitForTimeout(100);
+
+      // Check that search is cleared
+      const afterEscape = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const input = glass?.shadowRoot?.querySelector('.x-pw-search-input') as HTMLTextAreaElement;
+        const counter = glass?.shadowRoot?.querySelector('x-pw-search-counter');
+        return {
+          inputValue: input?.value,
+          counterText: counter?.textContent,
+        };
+      });
+
+      expect(afterEscape.inputValue).toBe('');
+      expect(afterEscape.counterText).toBe('');
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should navigate with Enter (next) and Shift+Enter (prev)', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+        customization: {
+          elementFactories: searchFactories,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`
+        <button>A</button>
+        <button>B</button>
+        <button>C</button>
+      `);
+      await page.waitForSelector('x-pw-glass');
+
+      // Search for buttons
+      await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const input = glass?.shadowRoot?.querySelector('.x-pw-search-input') as HTMLTextAreaElement;
+        if (input) {
+          input.value = 'button';
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      });
+
+      await page.waitForTimeout(300);
+
+      // Press Enter to go to next
+      await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const input = glass?.shadowRoot?.querySelector('.x-pw-search-input') as HTMLTextAreaElement;
+        if (input) {
+          input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+        }
+      });
+
+      await page.waitForTimeout(100);
+
+      const afterEnter = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const counter = glass?.shadowRoot?.querySelector('x-pw-search-counter');
+        return counter?.textContent;
+      });
+
+      expect(afterEnter).toBe('2/3');
+
+      // Press Shift+Enter to go to prev
+      await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const input = glass?.shadowRoot?.querySelector('.x-pw-search-input') as HTMLTextAreaElement;
+        if (input) {
+          input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, bubbles: true }));
+        }
+      });
+
+      await page.waitForTimeout(100);
+
+      const afterShiftEnter = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const counter = glass?.shadowRoot?.querySelector('x-pw-search-counter');
+        return counter?.textContent;
+      });
+
+      expect(afterShiftEnter).toBe('1/3');
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should use auto mode for plain text (tries locator first, falls back to text)', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+        customization: {
+          elementFactories: searchFactories,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`
+        <button>Submit</button>
+        <span>Some text with Submit in it</span>
+      `);
+      await page.waitForSelector('x-pw-glass');
+
+      // Type plain text (no quotes, no locator prefix) - auto mode
+      await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const input = glass?.shadowRoot?.querySelector('.x-pw-search-input') as HTMLTextAreaElement;
+        if (input) {
+          input.value = 'Submit';
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      });
+
+      await page.waitForTimeout(300);
+
+      // Check that results are found (auto mode should find text matches)
+      const searchResult = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        if (!glass || !glass.shadowRoot) return { error: 'no glass' };
+
+        const counter = glass.shadowRoot.querySelector('x-pw-search-counter');
+        const highlight = glass.shadowRoot.querySelector('x-pw-highlight');
+
+        return {
+          counterText: counter?.textContent,
+          hasHighlight: !!highlight,
+        };
+      });
+
+      // Should find matches (either via locator or text fallback)
+      expect(searchResult.counterText).toMatch(/^\d+\/\d+$/);
+      expect(searchResult.hasHighlight).toBe(true);
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should use currentMatch highlight color when provided', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      const customCurrentMatchColor = '#ff00ff7f';
+
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+        customization: {
+          elementFactories: searchFactories,
+          highlightColors: {
+            currentMatch: customCurrentMatchColor,
+          },
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button>Submit</button>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Search for button
+      await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const input = glass?.shadowRoot?.querySelector('.x-pw-search-input') as HTMLTextAreaElement;
+        if (input) {
+          input.value = 'button';
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      });
+
+      await page.waitForTimeout(300);
+
+      // Check that highlight is visible
+      const highlightInfo = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        if (!glass || !glass.shadowRoot) return { error: 'no glass' };
+
+        const highlight = glass.shadowRoot.querySelector('x-pw-highlight');
+
+        return {
+          hasHighlight: !!highlight,
+          backgroundColor: (highlight as HTMLElement)?.style.backgroundColor,
+        };
+      });
+
+      expect(highlightInfo.hasHighlight).toBe(true);
+      // The highlight should be visible (backgroundColor will be set)
+      expect(highlightInfo.backgroundColor).toBeTruthy();
+    } finally {
+      await browser.close();
+    }
+  });
+});

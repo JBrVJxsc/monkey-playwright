@@ -33,6 +33,7 @@ import clipPaths from "./clipPaths";
  *   NEW: getFactories().createOverlay(document)
  */
 import { getFactories, getHighlightColors } from "./recorderElementFactories";
+import { FuzzySearchTool } from "./fuzzySearchTool";
 
 import type { Point } from "@isomorphic/types";
 import type { AriaSnapshot } from "../ariaSnapshot";
@@ -1298,6 +1299,7 @@ class Overlay {
   private _assertTextToggle: HTMLElement;
   private _assertValuesToggle: HTMLElement;
   private _assertSnapshotToggle: HTMLElement;
+  private _fuzzySearchTool: FuzzySearchTool | null = null;
   private _offsetX = 0;
   private _dragState:
     | { offsetX: number; dragStart: { x: number; y: number } }
@@ -1352,6 +1354,12 @@ class Overlay {
       "Assert snapshot",
     );
     toolsListElement.appendChild(this._assertSnapshotToggle);
+
+    // Add fuzzy search tool if custom search factories are provided
+    if (factories.createSearchContainer) {
+      this._fuzzySearchTool = new FuzzySearchTool(recorder);
+      this._fuzzySearchTool.install(toolsListElement);
+    }
 
     this._updateVisualPosition();
     this._refreshListeners();
