@@ -1226,6 +1226,7 @@ class TextAssertionTool implements RecorderTool {
     this._dialog.close();
     this._recorder.recordAction(this._action);
     this._recorder.setMode("recording");
+    this._recorder.overlay?.flashToolSucceeded("assertingText");
   }
 
   private _showDialog() {
@@ -1503,10 +1504,15 @@ class Overlay {
   }
 
   flashToolSucceeded(
-    tool: "assertingVisibility" | "assertingSnapshot" | "assertingValue",
+    tool:
+      | "assertingText"
+      | "assertingVisibility"
+      | "assertingSnapshot"
+      | "assertingValue",
   ) {
     let element: Element;
-    if (tool === "assertingVisibility") element = this._assertVisibilityToggle;
+    if (tool === "assertingText") element = this._assertTextToggle;
+    else if (tool === "assertingVisibility") element = this._assertVisibilityToggle;
     else if (tool === "assertingSnapshot") element = this._assertSnapshotToggle;
     else element = this._assertValuesToggle;
     element.classList.add("succeeded");
