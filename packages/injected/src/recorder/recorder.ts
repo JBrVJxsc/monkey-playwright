@@ -303,7 +303,7 @@ class RecordActionTool implements RecorderTool {
     if (event.detail === 1) {
       this._pendingClickAction = {
         action: {
-          name: "click",
+          name: 'click',
           selector: this._hoveredModel!.selector,
           position: positionForEvent(event),
           signals: [],
@@ -312,8 +312,8 @@ class RecordActionTool implements RecorderTool {
           clickCount: event.detail,
         },
         timeout: this._recorder.injectedScript.utils.builtins.setTimeout(
-          () => this._commitPendingClickAction(),
-          200,
+            () => this._commitPendingClickAction(),
+            200,
         ),
       };
     }
@@ -474,13 +474,23 @@ class RecordActionTool implements RecorderTool {
       });
     }
 
-    if (target.nodeName === "SELECT") {
+    if (target.nodeName === 'SELECT') {
       const selectElement = target as HTMLSelectElement;
+      // Use _activeModel if available, otherwise generate selector from target
+      // (_activeModel might not be set because mouse events are ignored for SELECT)
+      let selector = this._activeModel?.selector;
+      if (!selector) {
+        const generated = this._recorder.injectedScript.generateSelector(
+            target,
+            { testIdAttributeName: this._recorder.state.testIdAttributeName },
+        );
+        selector = generated.selector;
+      }
       this._recordAction({
-        name: "select",
-        selector: this._activeModel!.selector,
+        name: 'select',
+        selector,
         options: [...selectElement.selectedOptions].map(
-          (option) => option.value,
+            option => option.value,
         ),
         signals: [],
       });
@@ -1619,16 +1629,19 @@ export class Recorder {
   readonly document: Document;
   private _delegate: RecorderDelegate = {};
 
+  readonly recorderMode: 'default' | 'api' | 'programmatic';
+
   constructor(
     injectedScript: InjectedScript,
-    options?: { recorderMode?: "default" | "api" | "programmatic" },
+    options?: { recorderMode?: 'default' | 'api' | 'programmatic' },
   ) {
     this.document = injectedScript.document;
     this.injectedScript = injectedScript;
     this.highlight = injectedScript.createHighlight();
+    this.recorderMode = options?.recorderMode || 'default';
     // For pure 'api' mode, use JsonRecordActionTool (lightweight, no hover highlights)
     // For 'programmatic' and 'default' modes, use RecordActionTool (full UI interaction with hover highlights)
-    const useJsonRecorder = options?.recorderMode === "api";
+    const useJsonRecorder = this.recorderMode === 'api';
     this._tools = {
       none: new NoneTool(),
       standby: new NoneTool(),
@@ -1636,11 +1649,11 @@ export class Recorder {
       recording: useJsonRecorder
         ? new JsonRecordActionTool(this)
         : new RecordActionTool(this),
-      "recording-inspecting": new InspectTool(this, false),
-      assertingText: new TextAssertionTool(this, "text"),
+      'recording-inspecting': new InspectTool(this, false),
+      assertingText: new TextAssertionTool(this, 'text'),
       assertingVisibility: new InspectTool(this, true),
-      assertingValue: new TextAssertionTool(this, "value"),
-      assertingSnapshot: new TextAssertionTool(this, "snapshot"),
+      assertingValue: new TextAssertionTool(this, 'value'),
+      assertingSnapshot: new TextAssertionTool(this, 'snapshot'),
     };
     this._currentTool = this._tools.none;
     this._currentTool.install?.();

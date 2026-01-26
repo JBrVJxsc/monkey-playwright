@@ -121,8 +121,9 @@ test.describe("Programmatic Recorder API", () => {
     );
     await page.getByRole("button", { name: "Submit" }).click();
 
+    // Wait for action to be recorded (200ms stall for double-click detection + async propagation)
+    await expect.poll(() => action("click").length).toBe(1);
     const clickActions = action("click");
-    expect(clickActions).toHaveLength(1);
     expect(clickActions[0].action.name).toBe("click");
     expect(normalizeCode(clickActions[0].code)).toContain(
       `getByRole('button', { name: 'Submit' })`,
@@ -149,7 +150,8 @@ test.describe("Programmatic Recorder API", () => {
     await page.setContent(`<button>Click me</button>`);
     await page.getByRole("button", { name: "Click me" }).click();
 
-    expect(action("click")).toHaveLength(1);
+    // Wait for action to be recorded (200ms stall for double-click detection + async propagation)
+    await expect.poll(() => action("click").length).toBe(1);
 
     // Clear the recording
     await sendCommand("clear");
@@ -229,8 +231,9 @@ test.describe("Programmatic Recorder API", () => {
     `);
     await page.getByRole("combobox").selectOption("b");
 
+    // Wait for action to be recorded (async propagation)
+    await expect.poll(() => action("select").length).toBe(1);
     const selectActions = action("select");
-    expect(selectActions).toHaveLength(1);
     expect(selectActions[0].action.name).toBe("select");
   });
 
@@ -270,13 +273,16 @@ test.describe("Programmatic Recorder API", () => {
     await page.setContent(`<button>Click me</button>`);
 
     await page.getByRole("button", { name: "Click me" }).click();
-    expect(action("click")).toHaveLength(1);
+    // Wait for action to be recorded (200ms stall for double-click detection + async propagation)
+    await expect.poll(() => action("click").length).toBe(1);
 
     // Disable recorder
     await (context as any)._disableRecorder();
 
     // This click should not be recorded
     await page.getByRole("button", { name: "Click me" }).click();
+    // Wait a bit to ensure if any action were to be recorded, it would be
+    await page.waitForTimeout(300);
     expect(action("click")).toHaveLength(1); // Still 1, not 2
   });
 
@@ -347,6 +353,9 @@ test.describe("Programmatic Recorder API", () => {
     const page = await context.newPage();
     await page.setContent(`<button>Test</button>`);
     await page.getByRole("button", { name: "Test" }).click();
+
+    // Wait for action to be recorded (200ms stall for double-click detection + async propagation)
+    await expect.poll(() => log.actions.filter((a) => a.action.name === "click").length).toBe(1);
 
     // Programmatic API should still receive events
     const clickActions = log.actions.filter((a) => a.action.name === "click");
