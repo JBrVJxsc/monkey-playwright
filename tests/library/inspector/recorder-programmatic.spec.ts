@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-import { test, expect } from "./inspectorTest";
+import { test, expect } from './inspectorTest';
 
-import type { Page } from "@playwright/test";
-import type * as actions from "@recorder/actions";
+import type { Page } from '@playwright/test';
+import type * as actions from '@recorder/actions';
 import type {
   Mode,
   Source,
   ElementInfo,
   CallLog,
-} from "@recorder/recorderTypes";
+} from '@recorder/recorderTypes';
 
 /**
  * Extended RecorderLog that captures all events from the programmatic recorder mode.
@@ -86,51 +86,51 @@ class ProgrammaticRecorderLog {
 async function startProgrammaticRecording(context: any) {
   const log = new ProgrammaticRecorderLog();
   await context._enableRecorder(
-    {
-      mode: "recording",
-      recorderMode: "programmatic",
-    },
-    log,
+      {
+        mode: 'recording',
+        recorderMode: 'programmatic',
+      },
+      log,
   );
   return {
     log,
-    action: (name: string) => log.actions.filter((a) => a.action.name === name),
+    action: (name: string) => log.actions.filter(a => a.action.name === name),
     sendCommand: (method: string, params?: any) =>
       context._sendRecorderCommand(method, params),
   };
 }
 
 function normalizeCode(code: string): string {
-  return code.replace(/\s+/g, " ").trim();
+  return code.replace(/\s+/g, ' ').trim();
 }
 
-test.describe("Programmatic Recorder API", () => {
-  test("should receive initial state events", async ({ context }) => {
+test.describe('Programmatic Recorder API', () => {
+  test('should receive initial state events', async ({ context }) => {
     const { log } = await startProgrammaticRecording(context);
 
     // Should receive initial mode and pause state
-    expect(log.modeChanges).toContain("recording");
+    expect(log.modeChanges).toContain('recording');
     expect(log.pauseStateChanges).toContain(false);
   });
 
-  test("should record click actions", async ({ context }) => {
+  test('should record click actions', async ({ context }) => {
     const { action } = await startProgrammaticRecording(context);
     const page = await context.newPage();
     await page.setContent(
-      `<button onclick="console.log('click')">Submit</button>`,
+        `<button onclick="console.log('click')">Submit</button>`,
     );
-    await page.getByRole("button", { name: "Submit" }).click();
+    await page.getByRole('button', { name: 'Submit' }).click();
 
     // Wait for action to be recorded (200ms stall for double-click detection + async propagation)
-    await expect.poll(() => action("click").length).toBe(1);
-    const clickActions = action("click");
-    expect(clickActions[0].action.name).toBe("click");
+    await expect.poll(() => action('click').length).toBe(1);
+    const clickActions = action('click');
+    expect(clickActions[0].action.name).toBe('click');
     expect(normalizeCode(clickActions[0].code)).toContain(
-      `getByRole('button', { name: 'Submit' })`,
+        `getByRole('button', { name: 'Submit' })`,
     );
   });
 
-  test("should send setMode command", async ({ context }) => {
+  test('should send setMode command', async ({ context }) => {
     const { log, sendCommand } = await startProgrammaticRecording(context);
     await context.newPage();
 
@@ -138,37 +138,37 @@ test.describe("Programmatic Recorder API", () => {
     log.modeChanges.length = 0;
 
     // Change mode to inspecting
-    await sendCommand("setMode", { mode: "inspecting" });
+    await sendCommand('setMode', { mode: 'inspecting' });
 
     // Should receive modeChanged event
-    expect(log.modeChanges).toContain("inspecting");
+    expect(log.modeChanges).toContain('inspecting');
   });
 
-  test("should send clear command", async ({ context }) => {
+  test('should send clear command', async ({ context }) => {
     const { action, sendCommand } = await startProgrammaticRecording(context);
     const page = await context.newPage();
     await page.setContent(`<button>Click me</button>`);
-    await page.getByRole("button", { name: "Click me" }).click();
+    await page.getByRole('button', { name: 'Click me' }).click();
 
     // Wait for action to be recorded (200ms stall for double-click detection + async propagation)
-    await expect.poll(() => action("click").length).toBe(1);
+    await expect.poll(() => action('click').length).toBe(1);
 
     // Clear the recording
-    await sendCommand("clear");
+    await sendCommand('clear');
 
     // Note: clear() doesn't remove already recorded actions from our log,
     // it just clears the internal state for navigation-based reset
   });
 
-  test("should send step command", async ({ context }) => {
+  test('should send step command', async ({ context }) => {
     const { sendCommand } = await startProgrammaticRecording(context);
     await context.newPage();
 
     // Step command should not throw (it resumes with single-step)
-    await sendCommand("step");
+    await sendCommand('step');
   });
 
-  test("should send highlightRequested command with selector", async ({
+  test('should send highlightRequested command with selector', async ({
     context,
   }) => {
     const { sendCommand } = await startProgrammaticRecording(context);
@@ -176,51 +176,51 @@ test.describe("Programmatic Recorder API", () => {
     await page.setContent(`<button id="myBtn">Highlight me</button>`);
 
     // This should highlight the element in the browser
-    await sendCommand("highlightRequested", { selector: "#myBtn" });
+    await sendCommand('highlightRequested', { selector: '#myBtn' });
 
     // No direct event for this, but it should not throw
   });
 
-  test("should send hideHighlight command", async ({ context }) => {
+  test('should send hideHighlight command', async ({ context }) => {
     const { sendCommand } = await startProgrammaticRecording(context);
     await context.newPage();
 
     // Should not throw
-    await sendCommand("hideHighlight");
+    await sendCommand('hideHighlight');
   });
 
-  test("should send setLanguage command", async ({ context }) => {
+  test('should send setLanguage command', async ({ context }) => {
     const { sendCommand } = await startProgrammaticRecording(context);
     await context.newPage();
 
     // Should not throw
-    await sendCommand("setLanguage", { language: "python" });
+    await sendCommand('setLanguage', { language: 'python' });
   });
 
-  test("should throw on unknown command", async ({ context }) => {
+  test('should throw on unknown command', async ({ context }) => {
     const { sendCommand } = await startProgrammaticRecording(context);
     await context.newPage();
 
-    await expect(sendCommand("unknownCommand", {})).rejects.toThrow(
-      "Unknown recorder command: unknownCommand",
+    await expect(sendCommand('unknownCommand', {})).rejects.toThrow(
+        'Unknown recorder command: unknownCommand',
     );
   });
 
-  test("should record fill actions", async ({ context }) => {
+  test('should record fill actions', async ({ context }) => {
     const { action } = await startProgrammaticRecording(context);
     const page = await context.newPage();
     await page.setContent(`<input type="text" placeholder="Enter text" />`);
-    await page.getByPlaceholder("Enter text").fill("Hello World");
+    await page.getByPlaceholder('Enter text').fill('Hello World');
     // Small wait to ensure action event is processed
     await page.waitForTimeout(100);
 
-    const fillActions = action("fill");
+    const fillActions = action('fill');
     expect(fillActions).toHaveLength(1);
-    expect(fillActions[0].action.name).toBe("fill");
-    expect((fillActions[0].action as any).text).toBe("Hello World");
+    expect(fillActions[0].action.name).toBe('fill');
+    expect((fillActions[0].action as any).text).toBe('Hello World');
   });
 
-  test("should record select actions", async ({ context }) => {
+  test('should record select actions', async ({ context }) => {
     const { action } = await startProgrammaticRecording(context);
     const page = await context.newPage();
     await page.setContent(`
@@ -229,15 +229,15 @@ test.describe("Programmatic Recorder API", () => {
         <option value="b">Option B</option>
       </select>
     `);
-    await page.getByRole("combobox").selectOption("b");
+    await page.getByRole('combobox').selectOption('b');
 
     // Wait for action to be recorded (async propagation)
-    await expect.poll(() => action("select").length).toBe(1);
-    const selectActions = action("select");
-    expect(selectActions[0].action.name).toBe("select");
+    await expect.poll(() => action('select').length).toBe(1);
+    const selectActions = action('select');
+    expect(selectActions[0].action.name).toBe('select');
   });
 
-  test("should toggle between recording and inspecting modes", async ({
+  test('should toggle between recording and inspecting modes', async ({
     context,
   }) => {
     const { log, sendCommand } = await startProgrammaticRecording(context);
@@ -247,15 +247,15 @@ test.describe("Programmatic Recorder API", () => {
     log.modeChanges.length = 0;
 
     // Toggle to inspecting
-    await sendCommand("setMode", { mode: "inspecting" });
-    expect(log.modeChanges).toContain("inspecting");
+    await sendCommand('setMode', { mode: 'inspecting' });
+    expect(log.modeChanges).toContain('inspecting');
 
     // Toggle back to recording
-    await sendCommand("setMode", { mode: "recording" });
-    expect(log.modeChanges).toContain("recording");
+    await sendCommand('setMode', { mode: 'recording' });
+    expect(log.modeChanges).toContain('recording');
   });
 
-  test("should work with navigation signals", async ({ context, server }) => {
+  test('should work with navigation signals', async ({ context, server }) => {
     const { log } = await startProgrammaticRecording(context);
     const page = await context.newPage();
 
@@ -265,37 +265,37 @@ test.describe("Programmatic Recorder API", () => {
     expect(log.pageNavigations.length).toBeGreaterThan(0);
   });
 
-  test("should disable recorder and stop receiving events", async ({
+  test('should disable recorder and stop receiving events', async ({
     context,
   }) => {
-    const { log, action } = await startProgrammaticRecording(context);
+    const { action } = await startProgrammaticRecording(context);
     const page = await context.newPage();
     await page.setContent(`<button>Click me</button>`);
 
-    await page.getByRole("button", { name: "Click me" }).click();
+    await page.getByRole('button', { name: 'Click me' }).click();
     // Wait for action to be recorded (200ms stall for double-click detection + async propagation)
-    await expect.poll(() => action("click").length).toBe(1);
+    await expect.poll(() => action('click').length).toBe(1);
 
     // Disable recorder
     await (context as any)._disableRecorder();
 
     // This click should not be recorded
-    await page.getByRole("button", { name: "Click me" }).click();
+    await page.getByRole('button', { name: 'Click me' }).click();
     // Wait a bit to ensure if any action were to be recorded, it would be
     await page.waitForTimeout(300);
-    expect(action("click")).toHaveLength(1); // Still 1, not 2
+    expect(action('click')).toHaveLength(1); // Still 1, not 2
   });
 
-  test("sendRecorderCommand should fail when recorder not enabled", async ({
+  test('sendRecorderCommand should fail when recorder not enabled', async ({
     context,
   }) => {
     // Don't enable recorder, just try to send command
     await expect(
-      (context as any)._sendRecorderCommand("setMode", { mode: "recording" }),
-    ).rejects.toThrow("Recorder is not enabled");
+        (context as any)._sendRecorderCommand('setMode', { mode: 'recording' }),
+    ).rejects.toThrow('Recorder is not enabled');
   });
 
-  test("should handle setMode command with missing params gracefully", async ({
+  test('should handle setMode command with missing params gracefully', async ({
     context,
   }) => {
     const { log, sendCommand } = await startProgrammaticRecording(context);
@@ -304,24 +304,24 @@ test.describe("Programmatic Recorder API", () => {
     const initialModeCount = log.modeChanges.length;
 
     // Send setMode without mode param - should not crash or change mode
-    await sendCommand("setMode", {});
-    await sendCommand("setMode", undefined);
+    await sendCommand('setMode', {});
+    await sendCommand('setMode', undefined);
 
     // Mode should not have changed
     expect(log.modeChanges.length).toBe(initialModeCount);
   });
 
-  test("should send resume command", async ({ context }) => {
+  test('should send resume command', async ({ context }) => {
     const { sendCommand } = await startProgrammaticRecording(context);
     await context.newPage();
 
     // Resume command should execute without throwing
     // Note: We don't test pause() directly because it waits for user interaction
     // and would cause test timeout. The step() test covers the pause functionality.
-    await sendCommand("resume");
+    await sendCommand('resume');
   });
 
-  test("should send highlightRequested command with ariaTemplate", async ({
+  test('should send highlightRequested command with ariaTemplate', async ({
     context,
   }) => {
     const { sendCommand } = await startProgrammaticRecording(context);
@@ -329,43 +329,43 @@ test.describe("Programmatic Recorder API", () => {
     await page.setContent(`<button aria-label="Submit form">Submit</button>`);
 
     // This should highlight the element using aria template
-    await sendCommand("highlightRequested", {
-      ariaTemplate: { role: "button", name: "Submit form" },
+    await sendCommand('highlightRequested', {
+      ariaTemplate: { role: 'button', name: 'Submit form' },
     });
 
     // Should not throw
   });
 
-  test("should work with showSidePanel option for debugging", async ({
+  test('should work with showSidePanel option for debugging', async ({
     context,
     toImpl,
   }) => {
     const log = new ProgrammaticRecorderLog();
     await (context as any)._enableRecorder(
-      {
-        mode: "recording",
-        recorderMode: "programmatic",
-        showSidePanel: true,
-      },
-      log,
+        {
+          mode: 'recording',
+          recorderMode: 'programmatic',
+          showSidePanel: true,
+        },
+        log,
     );
 
     const page = await context.newPage();
     await page.setContent(`<button>Test</button>`);
-    await page.getByRole("button", { name: "Test" }).click();
+    await page.getByRole('button', { name: 'Test' }).click();
 
     // Wait for action to be recorded (200ms stall for double-click detection + async propagation)
-    await expect.poll(() => log.actions.filter((a) => a.action.name === "click").length).toBe(1);
+    await expect.poll(() => log.actions.filter(a => a.action.name === 'click').length).toBe(1);
 
     // Programmatic API should still receive events
-    const clickActions = log.actions.filter((a) => a.action.name === "click");
+    const clickActions = log.actions.filter(a => a.action.name === 'click');
     expect(clickActions).toHaveLength(1);
 
     // Side panel should also be opened (recorderAppForTest is set when side window opens)
     expect(toImpl(context).recorderAppForTest).toBeTruthy();
   });
 
-  test("programmatic mode should keep highlight installed for hover functionality", async ({
+  test('programmatic mode should keep highlight installed for hover functionality', async ({
     context,
   }) => {
     // This test verifies that programmatic mode uses RecordActionTool (not JsonRecordActionTool).
@@ -377,31 +377,31 @@ test.describe("Programmatic Recorder API", () => {
 
     // Wait for recorder to be ready - glass pane should be present and stay present
     await page.waitForFunction(() => {
-      return document.querySelector("x-pw-glass") !== null;
+      return document.querySelector('x-pw-glass') !== null;
     });
 
     // In programmatic mode with RecordActionTool, the highlight should remain installed
     // (JsonRecordActionTool.install() would call highlight.uninstall() removing the glass pane)
     const highlightInstalled = await page.evaluate(() => {
-      const glass = document.querySelector("x-pw-glass");
+      const glass = document.querySelector('x-pw-glass');
       // If glass exists and is in the DOM, highlight is installed
       return glass !== null && document.documentElement.contains(glass);
     });
     expect(highlightInstalled).toBe(true);
   });
 
-  test("API mode should uninstall highlight for performance", async ({
+  test('API mode should uninstall highlight for performance', async ({
     context,
   }) => {
     // This test verifies that pure API mode uses JsonRecordActionTool
     // which uninstalls highlight for performance (no visual feedback needed).
     const log = new ProgrammaticRecorderLog();
     await (context as any)._enableRecorder(
-      {
-        mode: "recording",
-        recorderMode: "api",
-      },
-      log,
+        {
+          mode: 'recording',
+          recorderMode: 'api',
+        },
+        log,
     );
     const page = await context.newPage();
     await page.setContent(`<button id="noHoverBtn">No hover</button>`);
@@ -412,7 +412,7 @@ test.describe("Programmatic Recorder API", () => {
 
     // Verify glass pane is not in DOM (highlight uninstalled)
     const glassInDom = await page.evaluate(() => {
-      const glass = document.querySelector("x-pw-glass");
+      const glass = document.querySelector('x-pw-glass');
       return glass !== null && document.documentElement.contains(glass);
     });
     expect(glassInDom).toBe(false);

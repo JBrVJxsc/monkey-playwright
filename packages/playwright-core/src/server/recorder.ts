@@ -233,9 +233,9 @@ export class Recorder extends EventEmitter<RecorderEventMap> implements Instrume
           (_source: BindingSource, text: string): { fragment: AriaTemplateNode | null; error: string | null } => {
             try {
               const result = parseAriaSnapshot(yaml, text, { prettyErrors: false });
-              if (result.errors.length > 0) {
+              if (result.errors.length > 0)
                 return { fragment: null, error: result.errors[0].message };
-              }
+
               return { fragment: result.fragment, error: null };
             } catch (e) {
               return { fragment: null, error: String(e) };

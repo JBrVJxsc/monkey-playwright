@@ -79,9 +79,11 @@ test.describe('recorder customization via inProcessFactory', () => {
       // Check that highlight is visible and has a background color set
       const highlightInfo = await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
-        if (!glass || !glass.shadowRoot) return null;
+        if (!glass || !glass.shadowRoot)
+          return null;
         const highlight = glass.shadowRoot.querySelector('x-pw-highlight');
-        if (!highlight) return null;
+        if (!highlight)
+          return null;
         return {
           visible: (highlight as HTMLElement).style.display !== 'none',
           backgroundColor: (highlight as HTMLElement).style.backgroundColor,
@@ -125,9 +127,11 @@ test.describe('recorder customization via inProcessFactory', () => {
       // Check that custom CSS is applied to tooltip
       const tooltipStyle = await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
-        if (!glass || !glass.shadowRoot) return null;
+        if (!glass || !glass.shadowRoot)
+          return null;
         const tooltip = glass.shadowRoot.querySelector('x-pw-tooltip');
-        if (!tooltip) return null;
+        if (!tooltip)
+          return null;
         const style = getComputedStyle(tooltip);
         return {
           borderRadius: style.borderRadius,
@@ -184,7 +188,8 @@ test.describe('recorder customization via inProcessFactory', () => {
       // Check custom attributes from factories
       const customAttributes = await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
-        if (!glass || !glass.shadowRoot) return { error: 'no shadow root' };
+        if (!glass || !glass.shadowRoot)
+          return { error: 'no shadow root' };
 
         const highlight = glass.shadowRoot.querySelector('x-pw-highlight');
         const tooltip = glass.shadowRoot.querySelector('x-pw-tooltip');
@@ -241,10 +246,12 @@ test.describe('recorder customization via inProcessFactory', () => {
       // Check that overlay tool items have custom class and attributes
       const toolItemInfo = await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
-        if (!glass || !glass.shadowRoot) return null;
+        if (!glass || !glass.shadowRoot)
+          return null;
 
         const recordTool = glass.shadowRoot.querySelector('x-pw-tool-item.record');
-        if (!recordTool) return null;
+        if (!recordTool)
+          return null;
 
         return {
           hasCustomClass: recordTool.classList.contains('my-custom-tool'),
@@ -304,10 +311,12 @@ test.describe('recorder customization via inProcessFactory', () => {
       // Check all customizations are applied
       const result = await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
-        if (!glass || !glass.shadowRoot) return null;
+        if (!glass || !glass.shadowRoot)
+          return null;
 
         const tooltip = glass.shadowRoot.querySelector('x-pw-tooltip');
-        if (!tooltip) return null;
+        if (!tooltip)
+          return null;
 
         const style = getComputedStyle(tooltip);
         return {
@@ -345,7 +354,8 @@ test.describe('recorder customization via inProcessFactory', () => {
       // Check that default elements are used (no custom attributes)
       const result = await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
-        if (!glass || !glass.shadowRoot) return null;
+        if (!glass || !glass.shadowRoot)
+          return null;
 
         const highlight = glass.shadowRoot.querySelector('x-pw-highlight');
         const tooltip = glass.shadowRoot.querySelector('x-pw-tooltip');
@@ -561,10 +571,12 @@ test.describe('Shadcn theme customization', () => {
       // Check that Shadcn CSS variables are applied
       const result = await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
-        if (!glass || !glass.shadowRoot) return null;
+        if (!glass || !glass.shadowRoot)
+          return null;
 
         const tooltip = glass.shadowRoot.querySelector('x-pw-tooltip');
-        if (!tooltip) return null;
+        if (!tooltip)
+          return null;
 
         const style = getComputedStyle(tooltip);
         return {
@@ -671,9 +683,11 @@ test.describe('Shadcn theme customization', () => {
 
       const highlightInfo = await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
-        if (!glass || !glass.shadowRoot) return null;
+        if (!glass || !glass.shadowRoot)
+          return null;
         const highlight = glass.shadowRoot.querySelector('x-pw-highlight');
-        if (!highlight) return null;
+        if (!highlight)
+          return null;
         return {
           exists: true,
           visible: (highlight as HTMLElement).style.display !== 'none',
@@ -748,7 +762,8 @@ test.describe('Shadcn theme customization', () => {
       // Check that all Shadcn customizations are applied
       const result = await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
-        if (!glass || !glass.shadowRoot) return null;
+        if (!glass || !glass.shadowRoot)
+          return null;
 
         const tooltip = glass.shadowRoot.querySelector('x-pw-tooltip');
         const highlight = glass.shadowRoot.querySelector('x-pw-highlight');
@@ -848,7 +863,8 @@ test.describe('Shadcn theme customization', () => {
       // Click on "Assert text" tool to open dialog
       const assertTextButton = await page.evaluateHandle(() => {
         const glass = document.querySelector('x-pw-glass');
-        if (!glass || !glass.shadowRoot) return null;
+        if (!glass || !glass.shadowRoot)
+          return null;
         return glass.shadowRoot.querySelector('x-pw-tool-item.text');
       });
 
@@ -863,10 +879,12 @@ test.describe('Shadcn theme customization', () => {
         // Check dialog structure
         const dialogInfo = await page.evaluate(() => {
           const glass = document.querySelector('x-pw-glass');
-          if (!glass || !glass.shadowRoot) return { error: 'no glass' };
+          if (!glass || !glass.shadowRoot)
+            return { error: 'no glass' };
 
           const dialog = glass.shadowRoot.querySelector('x-pw-dialog');
-          if (!dialog) return { error: 'no dialog' };
+          if (!dialog)
+            return { error: 'no dialog' };
 
           const header = dialog.querySelector('x-pw-dialog-header');
           const title = dialog.querySelector('x-pw-dialog-title');
@@ -931,10 +949,12 @@ test.describe('createToolIcon factory customization', () => {
       // Check that tool items use default x-div icons
       const iconInfo = await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
-        if (!glass || !glass.shadowRoot) return { error: 'no glass' };
+        if (!glass || !glass.shadowRoot)
+          return { error: 'no glass' };
 
         const recordTool = glass.shadowRoot.querySelector('x-pw-tool-item.record');
-        if (!recordTool) return { error: 'no record tool' };
+        if (!recordTool)
+          return { error: 'no record tool' };
 
         const iconChild = recordTool.firstElementChild;
         return {
@@ -1007,10 +1027,12 @@ test.describe('createToolIcon factory customization', () => {
       // Check that tool items use custom SVG icons
       const iconInfo = await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
-        if (!glass || !glass.shadowRoot) return { error: 'no glass' };
+        if (!glass || !glass.shadowRoot)
+          return { error: 'no glass' };
 
         const recordTool = glass.shadowRoot.querySelector('x-pw-tool-item.record');
-        if (!recordTool) return { error: 'no record tool' };
+        if (!recordTool)
+          return { error: 'no record tool' };
 
         const svg = recordTool.querySelector('svg');
         return {
@@ -1073,10 +1095,12 @@ test.describe('createToolIcon factory customization', () => {
       // Check that gripper uses custom SVG icon
       const gripperInfo = await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
-        if (!glass || !glass.shadowRoot) return { error: 'no glass' };
+        if (!glass || !glass.shadowRoot)
+          return { error: 'no glass' };
 
         const gripper = glass.shadowRoot.querySelector('x-pw-tool-gripper');
-        if (!gripper) return { error: 'no gripper' };
+        if (!gripper)
+          return { error: 'no gripper' };
 
         const svg = gripper.querySelector('svg');
         return {
@@ -1173,7 +1197,8 @@ test.describe('createToolIcon factory customization', () => {
       // Check multiple tool items for proper SVG attributes
       const iconsInfo = await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
-        if (!glass || !glass.shadowRoot) return { error: 'no glass' };
+        if (!glass || !glass.shadowRoot)
+          return { error: 'no glass' };
 
         const recordTool = glass.shadowRoot.querySelector('x-pw-tool-item.record');
         const pickLocatorTool = glass.shadowRoot.querySelector('x-pw-tool-item.pick-locator');
@@ -1264,7 +1289,8 @@ test.describe('createToolIcon factory customization', () => {
       // Check that record uses SVG but pick-locator falls back to x-div
       const fallbackInfo = await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
-        if (!glass || !glass.shadowRoot) return { error: 'no glass' };
+        if (!glass || !glass.shadowRoot)
+          return { error: 'no glass' };
 
         const recordTool = glass.shadowRoot.querySelector('x-pw-tool-item.record');
         const pickLocatorTool = glass.shadowRoot.querySelector('x-pw-tool-item.pick-locator');
@@ -1350,7 +1376,8 @@ test.describe('FuzzySearchTool', () => {
       // Check that search container does NOT exist
       const hasSearchUI = await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
-        if (!glass || !glass.shadowRoot) return null;
+        if (!glass || !glass.shadowRoot)
+          return null;
         return !!glass.shadowRoot.querySelector('x-pw-search-container');
       });
 
@@ -1380,7 +1407,8 @@ test.describe('FuzzySearchTool', () => {
       // Check that search UI is present
       const searchUIInfo = await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
-        if (!glass || !glass.shadowRoot) return { error: 'no glass' };
+        if (!glass || !glass.shadowRoot)
+          return { error: 'no glass' };
 
         const container = glass.shadowRoot.querySelector('x-pw-search-container');
         const input = glass.shadowRoot.querySelector('.x-pw-search-input');
@@ -1446,7 +1474,8 @@ test.describe('FuzzySearchTool', () => {
       // Check results
       const searchResult = await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
-        if (!glass || !glass.shadowRoot) return { error: 'no glass' };
+        if (!glass || !glass.shadowRoot)
+          return { error: 'no glass' };
 
         const counter = glass.shadowRoot.querySelector('x-pw-search-counter');
         const highlight = glass.shadowRoot.querySelector('x-pw-highlight');
@@ -1503,7 +1532,8 @@ test.describe('FuzzySearchTool', () => {
       // Check results
       const searchResult = await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
-        if (!glass || !glass.shadowRoot) return { error: 'no glass' };
+        if (!glass || !glass.shadowRoot)
+          return { error: 'no glass' };
 
         const counter = glass.shadowRoot.querySelector('x-pw-search-counter');
         const highlight = glass.shadowRoot.querySelector('x-pw-highlight');
@@ -1554,7 +1584,8 @@ test.describe('FuzzySearchTool', () => {
       // Check no-match state
       const noMatchState = await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
-        if (!glass || !glass.shadowRoot) return { error: 'no glass' };
+        if (!glass || !glass.shadowRoot)
+          return { error: 'no glass' };
 
         const input = glass.shadowRoot.querySelector('.x-pw-search-input');
         const counter = glass.shadowRoot.querySelector('x-pw-search-counter');
@@ -1762,9 +1793,9 @@ test.describe('FuzzySearchTool', () => {
       await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
         const input = glass?.shadowRoot?.querySelector('.x-pw-search-input') as HTMLTextAreaElement;
-        if (input) {
+        if (input)
           input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-        }
+
       });
 
       await page.waitForTimeout(100);
@@ -1824,9 +1855,9 @@ test.describe('FuzzySearchTool', () => {
       await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
         const input = glass?.shadowRoot?.querySelector('.x-pw-search-input') as HTMLTextAreaElement;
-        if (input) {
+        if (input)
           input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-        }
+
       });
 
       await page.waitForTimeout(100);
@@ -1843,9 +1874,9 @@ test.describe('FuzzySearchTool', () => {
       await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
         const input = glass?.shadowRoot?.querySelector('.x-pw-search-input') as HTMLTextAreaElement;
-        if (input) {
+        if (input)
           input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, bubbles: true }));
-        }
+
       });
 
       await page.waitForTimeout(100);
@@ -1897,7 +1928,8 @@ test.describe('FuzzySearchTool', () => {
       // Check that results are found (auto mode should find text matches)
       const searchResult = await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
-        if (!glass || !glass.shadowRoot) return { error: 'no glass' };
+        if (!glass || !glass.shadowRoot)
+          return { error: 'no glass' };
 
         const counter = glass.shadowRoot.querySelector('x-pw-search-counter');
         const highlight = glass.shadowRoot.querySelector('x-pw-highlight');
@@ -1953,7 +1985,8 @@ test.describe('FuzzySearchTool', () => {
       // Check that highlight is visible
       const highlightInfo = await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
-        if (!glass || !glass.shadowRoot) return { error: 'no glass' };
+        if (!glass || !glass.shadowRoot)
+          return { error: 'no glass' };
 
         const highlight = glass.shadowRoot.querySelector('x-pw-highlight');
 

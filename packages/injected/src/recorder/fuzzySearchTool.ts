@@ -39,16 +39,16 @@
  * If upstream adds similar functionality, consider whether to merge or maintain separately.
  */
 
-import { getFactories, getHighlightColors } from "./recorderElementFactories";
-import { locatorOrSelectorAsSelector } from "@isomorphic/locatorParser";
-import type { ElementText } from "../selectorUtils";
-import type { Recorder } from "./recorder";
+import { locatorOrSelectorAsSelector } from '@isomorphic/locatorParser';
+import { getFactories, getHighlightColors } from './recorderElementFactories';
+import type { ElementText } from '../selectorUtils';
+import type { Recorder } from './recorder';
 
 // ============================================================================
 // Types
 // ============================================================================
 
-export type SearchMode = "auto" | "locator" | "aria" | "text";
+export type SearchMode = 'auto' | 'locator' | 'aria' | 'text';
 
 export interface SearchState {
   query: string;
@@ -75,7 +75,8 @@ function addEventListener(
 }
 
 function removeEventListeners(listeners: (() => void)[]) {
-  for (const listener of listeners) listener();
+  for (const listener of listeners)
+    listener();
   listeners.splice(0, listeners.length);
 }
 
@@ -108,8 +109,8 @@ export class FuzzySearchTool {
   private _debounceTimer: number | undefined;
   private _textCache = new Map<Element | ShadowRoot, ElementText>();
   private _state: SearchState = {
-    query: "",
-    mode: "auto",
+    query: '',
+    mode: 'auto',
     matches: [],
     currentIndex: -1,
   };
@@ -138,15 +139,15 @@ export class FuzzySearchTool {
     const navContainer = factories.createSearchNav!(doc);
 
     this._counter = factories.createSearchCounter!(doc);
-    this._counter.textContent = "";
+    this._counter.textContent = '';
     navContainer.appendChild(this._counter);
 
-    this._prevButton = factories.createSearchNavButton!(doc, "prev");
-    this._prevButton.setAttribute("disabled", "");
+    this._prevButton = factories.createSearchNavButton!(doc, 'prev');
+    this._prevButton.setAttribute('disabled', '');
     navContainer.appendChild(this._prevButton);
 
-    this._nextButton = factories.createSearchNavButton!(doc, "next");
-    this._nextButton.setAttribute("disabled", "");
+    this._nextButton = factories.createSearchNavButton!(doc, 'next');
+    this._nextButton.setAttribute('disabled', '');
     navContainer.appendChild(this._nextButton);
 
     this._container.appendChild(navContainer);
@@ -154,12 +155,12 @@ export class FuzzySearchTool {
 
     // Set up event listeners
     this._listeners = [
-      addEventListener(this._input, "input", () => this._onSearchInput()),
-      addEventListener(this._input, "keydown", (e) =>
+      addEventListener(this._input, 'input', () => this._onSearchInput()),
+      addEventListener(this._input, 'keydown', e =>
         this._onKeyDown(e as KeyboardEvent),
       ),
-      addEventListener(this._prevButton, "click", () => this._navigatePrev()),
-      addEventListener(this._nextButton, "click", () => this._navigateNext()),
+      addEventListener(this._prevButton, 'click', () => this._navigatePrev()),
+      addEventListener(this._nextButton, 'click', () => this._navigateNext()),
     ];
   }
 
@@ -167,25 +168,25 @@ export class FuzzySearchTool {
     e.stopPropagation(); // Prevent recorder from capturing keystrokes
 
     switch (e.key) {
-      case "Enter":
+      case 'Enter':
         e.preventDefault();
-        if (e.shiftKey) {
+        if (e.shiftKey)
           this._navigatePrev();
-        } else {
+        else
           this._navigateNext();
-        }
+
         break;
-      case "Escape":
-        this._input!.value = "";
+      case 'Escape':
+        this._input!.value = '';
         this._clearSearch();
         break;
-      case "F3":
+      case 'F3':
         e.preventDefault();
-        if (e.shiftKey) {
+        if (e.shiftKey)
           this._navigatePrev();
-        } else {
+        else
           this._navigateNext();
-        }
+
         break;
     }
   }
@@ -194,18 +195,18 @@ export class FuzzySearchTool {
     // Debounce search
     if (this._debounceTimer) {
       this._recorder.injectedScript.utils.builtins.clearTimeout(
-        this._debounceTimer,
+          this._debounceTimer,
       );
     }
     this._debounceTimer =
       this._recorder.injectedScript.utils.builtins.setTimeout(
-        () => this._performSearchAsync(),
-        150,
+          () => this._performSearchAsync(),
+          150,
       );
   }
 
   private async _performSearchAsync() {
-    const query = this._input?.value.trim() || "";
+    const query = this._input?.value.trim() || '';
     if (!query) {
       this._clearSearch();
       return;
@@ -217,16 +218,16 @@ export class FuzzySearchTool {
 
     try {
       switch (mode) {
-        case "locator":
+        case 'locator':
           matches = this._searchByLocator(searchQuery);
           break;
-        case "aria":
+        case 'aria':
           matches = await this._searchByAriaAsync(searchQuery);
           break;
-        case "text":
+        case 'text':
           matches = this._searchByText(searchQuery);
           break;
-        case "auto":
+        case 'auto':
           matches = await this._searchAutoAsync(searchQuery);
           break;
       }
@@ -247,13 +248,14 @@ export class FuzzySearchTool {
     this._updateHighlight();
 
     // Scroll first match into view
-    if (matches.length > 0) {
+    if (matches.length > 0)
       this._scrollToCurrentMatch();
-    }
+
   }
 
   private _navigateNext() {
-    if (this._state.matches.length === 0) return;
+    if (this._state.matches.length === 0)
+      return;
 
     // Cycle to next (wrap around)
     this._state.currentIndex =
@@ -264,7 +266,8 @@ export class FuzzySearchTool {
   }
 
   private _navigatePrev() {
-    if (this._state.matches.length === 0) return;
+    if (this._state.matches.length === 0)
+      return;
 
     // Cycle to previous (wrap around)
     this._state.currentIndex =
@@ -280,9 +283,9 @@ export class FuzzySearchTool {
     const currentElement = this._state.matches[this._state.currentIndex];
     if (currentElement) {
       currentElement.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-        inline: "nearest",
+        behavior: 'smooth',
+        block: 'center',
+        inline: 'nearest',
       });
     }
   }
@@ -295,22 +298,22 @@ export class FuzzySearchTool {
     if (matches.length === 0 && this._input?.value.trim()) {
       // No matches - just show ring on input, keep counter empty
       this._counter!.textContent = '';
-      this._input!.classList.add("no-match");
+      this._input!.classList.add('no-match');
     } else if (matches.length > 0) {
       this._counter!.textContent = `${currentIndex + 1}/${matches.length}`;
-      this._input!.classList.remove("no-match");
+      this._input!.classList.remove('no-match');
     } else {
       this._counter!.textContent = '';
-      this._input!.classList.remove("no-match");
+      this._input!.classList.remove('no-match');
     }
 
     // Update navigation buttons
     if (hasMatches) {
-      this._prevButton!.removeAttribute("disabled");
-      this._nextButton!.removeAttribute("disabled");
+      this._prevButton!.removeAttribute('disabled');
+      this._nextButton!.removeAttribute('disabled');
     } else {
-      this._prevButton!.setAttribute("disabled", "");
-      this._nextButton!.setAttribute("disabled", "");
+      this._prevButton!.setAttribute('disabled', '');
+      this._nextButton!.setAttribute('disabled', '');
     }
   }
 
@@ -328,12 +331,12 @@ export class FuzzySearchTool {
     // Only highlight the current match, with locator tooltip
     const currentElement = matches[currentIndex];
     const generated = this._recorder.injectedScript.generateSelector(
-      currentElement,
-      { testIdAttributeName: this._recorder.state.testIdAttributeName },
+        currentElement,
+        { testIdAttributeName: this._recorder.state.testIdAttributeName },
     );
     const tooltipText = this._recorder.injectedScript.utils.asLocator(
-      this._recorder.state.language,
-      generated.selector,
+        this._recorder.state.language,
+        generated.selector,
     );
 
     this._recorder.highlight.updateHighlight([
@@ -368,22 +371,22 @@ export class FuzzySearchTool {
     searchQuery: string;
   } {
     // /aria: ... -> aria mode
-    if (query.startsWith("/aria:")) {
-      return { mode: "aria", searchQuery: query.slice(6).trim() };
-    }
+    if (query.startsWith('/aria:'))
+      return { mode: 'aria', searchQuery: query.slice(6).trim() };
+
 
     // YAML-style aria (starts with - or contains multi-line YAML structure)
-    if (query.startsWith("- ") || /^-\s+\w+/.test(query)) {
-      return { mode: "aria", searchQuery: query };
-    }
+    if (query.startsWith('- ') || /^-\s+\w+/.test(query))
+      return { mode: 'aria', searchQuery: query };
+
 
     // "text" or 'text' -> text mode
     if (
       (query.startsWith('"') && query.endsWith('"')) ||
       (query.startsWith("'") && query.endsWith("'"))
-    ) {
-      return { mode: "text", searchQuery: query.slice(1, -1) };
-    }
+    )
+      return { mode: 'text', searchQuery: query.slice(1, -1) };
+
 
     // Locator patterns
     const locatorPatterns = [
@@ -391,25 +394,25 @@ export class FuzzySearchTool {
       /^[a-z-]+\s*=/i, // attribute selectors like data-testid=
     ];
 
-    if (locatorPatterns.some((p) => p.test(query))) {
-      return { mode: "locator", searchQuery: query };
-    }
+    if (locatorPatterns.some(p => p.test(query)))
+      return { mode: 'locator', searchQuery: query };
 
-    return { mode: "auto", searchQuery: query };
+
+    return { mode: 'auto', searchQuery: query };
   }
 
   private _searchByLocator(query: string): Element[] {
     try {
       // Convert locator syntax to internal selector format
       const selector = locatorOrSelectorAsSelector(
-        this._recorder.state.language,
-        query,
-        this._recorder.state.testIdAttributeName,
+          this._recorder.state.language,
+          query,
+          this._recorder.state.testIdAttributeName,
       );
       const parsedSelector = this._recorder.injectedScript.parseSelector(selector);
       return this._recorder.injectedScript.querySelectorAll(
-        parsedSelector,
-        this._recorder.document,
+          parsedSelector,
+          this._recorder.document,
       );
     } catch {
       return [];
@@ -420,19 +423,19 @@ export class FuzzySearchTool {
     try {
       // Use the server-side binding to parse the aria template
       const parseAriaTemplate = (this._recorder.injectedScript.window as any)
-        .__pw_parseAriaTemplate;
-      if (!parseAriaTemplate) {
+          .__pw_parseAriaTemplate;
+      if (!parseAriaTemplate)
         return [];
-      }
+
 
       const result = await parseAriaTemplate(ariaQuery);
-      if (result.error || !result.fragment) {
+      if (result.error || !result.fragment)
         return [];
-      }
+
 
       return this._recorder.injectedScript.getAllElementsMatchingExpectAriaTemplate(
-        this._recorder.document,
-        result.fragment,
+          this._recorder.document,
+          result.fragment,
       );
     } catch {
       return [];
@@ -446,27 +449,27 @@ export class FuzzySearchTool {
     const normalizedQuery = textQuery.toLowerCase();
 
     const walker = this._recorder.document.createTreeWalker(
-      this._recorder.document.body,
-      NodeFilter.SHOW_ELEMENT,
+        this._recorder.document.body,
+        NodeFilter.SHOW_ELEMENT,
     );
 
     let node: Node | null;
     while ((node = walker.nextNode())) {
       const element = node as Element;
       const text = this._recorder.injectedScript.utils.elementText(
-        this._textCache,
-        element,
+          this._textCache,
+          element,
       );
 
       if (text.normalized.toLowerCase().includes(normalizedQuery)) {
         // Only include most specific matches (not parents of other matches)
-        const hasChildMatch = results.some((r) => element.contains(r));
+        const hasChildMatch = results.some(r => element.contains(r));
         if (!hasChildMatch) {
           // Remove any parents of this element from results
           for (let i = results.length - 1; i >= 0; i--) {
-            if (results[i].contains(element)) {
+            if (results[i].contains(element))
               results.splice(i, 1);
-            }
+
           }
           results.push(element);
         }
@@ -491,7 +494,7 @@ export class FuzzySearchTool {
   uninstall() {
     if (this._debounceTimer) {
       this._recorder.injectedScript.utils.builtins.clearTimeout(
-        this._debounceTimer,
+          this._debounceTimer,
       );
     }
     removeEventListeners(this._listeners);

@@ -189,9 +189,9 @@ export class RecorderApp {
       await FullProgrammaticRecorderApp.run(context, recorder, browserName, params);
       // If showSidePanel is true, also show the side window for debugging
       // Both programmatic API and side window can communicate with injected script simultaneously
-      if (params.showSidePanel) {
+      if (params.showSidePanel)
         await RecorderApp._show(recorder, context, params);
-      }
+
       return;
     }
     await RecorderApp._show(recorder, context, params);

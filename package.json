@@ -43,7 +43,8 @@
     "roll": "node utils/roll_browser.js",
     "check-deps": "node utils/check_deps.js",
     "build-android-driver": "./utils/build_android_driver.sh",
-    "innerloop": "playwright run-server --reuse-browser"
+    "innerloop": "playwright run-server --reuse-browser",
+    "prepare": "husky"
   },
   "workspaces": [
     "packages/*"
@@ -87,7 +88,9 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.2.0",
     "formidable": "^2.1.1",
+    "husky": "^9.1.7",
     "license-checker": "^25.0.1",
+    "lint-staged": "^16.2.7",
     "mime": "^3.0.0",
     "node-stream-zip": "^1.15.0",
     "react": "^19.2.1",
@@ -99,5 +102,16 @@
     "xml2js": "^0.5.0",
     "yaml": "2.6.0",
     "zod": "^4.3.5"
+  },
+  "lint-staged": {
+    "packages/injected/src/recorder/**/*.ts": [
+      "eslint --fix"
+    ],
+    "packages/playwright-core/src/**/*.ts": [
+      "eslint --fix"
+    ],
+    "tests/library/inspector/**/*.ts": [
+      "eslint --fix"
+    ]
   }
 }
