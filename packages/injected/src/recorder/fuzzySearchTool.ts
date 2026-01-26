@@ -140,14 +140,17 @@ export class FuzzySearchTool {
 
     this._counter = factories.createSearchCounter!(doc);
     this._counter.textContent = '';
+    this._counter.style.display = 'none'; // Hidden until results found
     navContainer.appendChild(this._counter);
 
     this._prevButton = factories.createSearchNavButton!(doc, 'prev');
     this._prevButton.setAttribute('disabled', '');
+    this._prevButton.style.display = 'none'; // Hidden until results found
     navContainer.appendChild(this._prevButton);
 
     this._nextButton = factories.createSearchNavButton!(doc, 'next');
     this._nextButton.setAttribute('disabled', '');
+    this._nextButton.style.display = 'none'; // Hidden until results found
     navContainer.appendChild(this._nextButton);
 
     this._container.appendChild(navContainer);
@@ -307,13 +310,19 @@ export class FuzzySearchTool {
       this._input!.classList.remove('no-match');
     }
 
-    // Update navigation buttons
+    // Update navigation buttons - hide when no results, show when results exist
     if (hasMatches) {
       this._prevButton!.removeAttribute('disabled');
       this._nextButton!.removeAttribute('disabled');
+      this._prevButton!.style.display = '';
+      this._nextButton!.style.display = '';
+      this._counter!.style.display = '';
     } else {
       this._prevButton!.setAttribute('disabled', '');
       this._nextButton!.setAttribute('disabled', '');
+      this._prevButton!.style.display = 'none';
+      this._nextButton!.style.display = 'none';
+      this._counter!.style.display = 'none';
     }
   }
 
@@ -351,18 +360,24 @@ export class FuzzySearchTool {
   private _setNoMatch() {
     this._state = { query: '', mode: 'auto', matches: [], currentIndex: -1 };
     this._counter!.textContent = '';
+    this._counter!.style.display = 'none';
     this._input!.classList.add('no-match');
     this._prevButton!.setAttribute('disabled', '');
     this._nextButton!.setAttribute('disabled', '');
+    this._prevButton!.style.display = 'none';
+    this._nextButton!.style.display = 'none';
     this._recorder.highlight.clearHighlight();
   }
 
   private _clearSearch() {
     this._state = { query: '', mode: 'auto', matches: [], currentIndex: -1 };
     this._counter!.textContent = '';
+    this._counter!.style.display = 'none';
     this._input!.classList.remove('no-match');
     this._prevButton!.setAttribute('disabled', '');
     this._nextButton!.setAttribute('disabled', '');
+    this._prevButton!.style.display = 'none';
+    this._nextButton!.style.display = 'none';
     this._recorder.highlight.clearHighlight();
   }
 

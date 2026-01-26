@@ -1437,6 +1437,144 @@ test.describe('FuzzySearchTool', () => {
     }
   });
 
+  test('should hide nav buttons and counter when no search results', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+        customization: {
+          elementFactories: searchFactories,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button>Click me</button>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Initially, nav buttons and counter should be hidden (no search yet)
+      const initialVisibility = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        if (!glass || !glass.shadowRoot)
+          return { error: 'no glass' };
+
+        const counter = glass.shadowRoot.querySelector('x-pw-search-counter') as HTMLElement;
+        const prevBtn = glass.shadowRoot.querySelector('x-pw-search-nav-btn.prev') as HTMLElement;
+        const nextBtn = glass.shadowRoot.querySelector('x-pw-search-nav-btn.next') as HTMLElement;
+
+        return {
+          counterHidden: counter?.style.display === 'none',
+          prevHidden: prevBtn?.style.display === 'none',
+          nextHidden: nextBtn?.style.display === 'none',
+        };
+      });
+
+      expect(initialVisibility.counterHidden).toBe(true);
+      expect(initialVisibility.prevHidden).toBe(true);
+      expect(initialVisibility.nextHidden).toBe(true);
+
+      // Search for something that exists - buttons should become visible
+      await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const input = glass?.shadowRoot?.querySelector('.x-pw-search-input') as HTMLTextAreaElement;
+        if (input) {
+          input.value = 'button';
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      });
+
+      await page.waitForTimeout(300);
+
+      const visibilityWithResults = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        if (!glass || !glass.shadowRoot)
+          return { error: 'no glass' };
+
+        const counter = glass.shadowRoot.querySelector('x-pw-search-counter') as HTMLElement;
+        const prevBtn = glass.shadowRoot.querySelector('x-pw-search-nav-btn.prev') as HTMLElement;
+        const nextBtn = glass.shadowRoot.querySelector('x-pw-search-nav-btn.next') as HTMLElement;
+
+        return {
+          counterVisible: counter?.style.display !== 'none',
+          prevVisible: prevBtn?.style.display !== 'none',
+          nextVisible: nextBtn?.style.display !== 'none',
+          counterText: counter?.textContent,
+        };
+      });
+
+      expect(visibilityWithResults.counterVisible).toBe(true);
+      expect(visibilityWithResults.prevVisible).toBe(true);
+      expect(visibilityWithResults.nextVisible).toBe(true);
+      expect(visibilityWithResults.counterText).toBe('1/1');
+
+      // Search for something that doesn't exist - buttons should be hidden again
+      await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const input = glass?.shadowRoot?.querySelector('.x-pw-search-input') as HTMLTextAreaElement;
+        if (input) {
+          input.value = '"nonexistent xyz123"';
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      });
+
+      await page.waitForTimeout(300);
+
+      const visibilityNoResults = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        if (!glass || !glass.shadowRoot)
+          return { error: 'no glass' };
+
+        const counter = glass.shadowRoot.querySelector('x-pw-search-counter') as HTMLElement;
+        const prevBtn = glass.shadowRoot.querySelector('x-pw-search-nav-btn.prev') as HTMLElement;
+        const nextBtn = glass.shadowRoot.querySelector('x-pw-search-nav-btn.next') as HTMLElement;
+
+        return {
+          counterHidden: counter?.style.display === 'none',
+          prevHidden: prevBtn?.style.display === 'none',
+          nextHidden: nextBtn?.style.display === 'none',
+        };
+      });
+
+      expect(visibilityNoResults.counterHidden).toBe(true);
+      expect(visibilityNoResults.prevHidden).toBe(true);
+      expect(visibilityNoResults.nextHidden).toBe(true);
+
+      // Clear search with Escape - buttons should remain hidden
+      await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const input = glass?.shadowRoot?.querySelector('.x-pw-search-input') as HTMLTextAreaElement;
+        if (input)
+          input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      });
+
+      await page.waitForTimeout(100);
+
+      const visibilityAfterClear = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        if (!glass || !glass.shadowRoot)
+          return { error: 'no glass' };
+
+        const counter = glass.shadowRoot.querySelector('x-pw-search-counter') as HTMLElement;
+        const prevBtn = glass.shadowRoot.querySelector('x-pw-search-nav-btn.prev') as HTMLElement;
+        const nextBtn = glass.shadowRoot.querySelector('x-pw-search-nav-btn.next') as HTMLElement;
+
+        return {
+          counterHidden: counter?.style.display === 'none',
+          prevHidden: prevBtn?.style.display === 'none',
+          nextHidden: nextBtn?.style.display === 'none',
+        };
+      });
+
+      expect(visibilityAfterClear.counterHidden).toBe(true);
+      expect(visibilityAfterClear.prevHidden).toBe(true);
+      expect(visibilityAfterClear.nextHidden).toBe(true);
+    } finally {
+      await browser.close();
+    }
+  });
+
   test('should find elements by text content (quoted text mode)', async () => {
     const playwright = createInProcessPlaywright();
     const browser = await playwright.chromium.launch({ headless: true });
