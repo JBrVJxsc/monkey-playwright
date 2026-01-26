@@ -103,6 +103,7 @@ export class FuzzySearchTool {
   private _recorder: Recorder;
   private _container: HTMLElement | null = null;
   private _input: HTMLTextAreaElement | null = null;
+  private _navContainer: HTMLElement | null = null;
   private _counter: HTMLElement | null = null;
   private _prevButton: HTMLElement | null = null;
   private _nextButton: HTMLElement | null = null;
@@ -128,32 +129,35 @@ export class FuzzySearchTool {
     // The Overlay constructor checks factories.createSearchContainer before calling this.
     // Using non-null assertions (!) because we know these factories exist.
 
-    // Create search container
+    // Create search container - don't let it expand, remove min-width constraint
     this._container = factories.createSearchContainer!(doc);
+    this._container.style.flex = 'none';
+    this._container.style.minWidth = '0';
+    this._container.style.maxWidth = 'none';
 
-    // Search input
+    // Search input - fixed width so toolbar expands/shrinks when nav appears/disappears
     this._input = factories.createSearchInput!(doc);
+    this._input.style.flex = 'none';
+    this._input.style.width = '150px';
     this._container.appendChild(this._input);
 
-    // Navigation controls
-    const navContainer = factories.createSearchNav!(doc);
+    // Navigation controls - hidden by default, shown when results exist
+    this._navContainer = factories.createSearchNav!(doc);
+    this._navContainer.style.display = 'none'; // Hidden until results found
 
     this._counter = factories.createSearchCounter!(doc);
     this._counter.textContent = '';
-    this._counter.style.display = 'none'; // Hidden until results found
-    navContainer.appendChild(this._counter);
+    this._navContainer.appendChild(this._counter);
 
     this._prevButton = factories.createSearchNavButton!(doc, 'prev');
     this._prevButton.setAttribute('disabled', '');
-    this._prevButton.style.display = 'none'; // Hidden until results found
-    navContainer.appendChild(this._prevButton);
+    this._navContainer.appendChild(this._prevButton);
 
     this._nextButton = factories.createSearchNavButton!(doc, 'next');
     this._nextButton.setAttribute('disabled', '');
-    this._nextButton.style.display = 'none'; // Hidden until results found
-    navContainer.appendChild(this._nextButton);
+    this._navContainer.appendChild(this._nextButton);
 
-    this._container.appendChild(navContainer);
+    this._container.appendChild(this._navContainer);
     toolsListElement.appendChild(this._container);
 
     // Set up event listeners
@@ -310,19 +314,15 @@ export class FuzzySearchTool {
       this._input!.classList.remove('no-match');
     }
 
-    // Update navigation buttons - hide when no results, show when results exist
+    // Update navigation container - hide when no results, show when results exist
     if (hasMatches) {
+      this._navContainer!.style.display = '';
       this._prevButton!.removeAttribute('disabled');
       this._nextButton!.removeAttribute('disabled');
-      this._prevButton!.style.display = '';
-      this._nextButton!.style.display = '';
-      this._counter!.style.display = '';
     } else {
+      this._navContainer!.style.display = 'none';
       this._prevButton!.setAttribute('disabled', '');
       this._nextButton!.setAttribute('disabled', '');
-      this._prevButton!.style.display = 'none';
-      this._nextButton!.style.display = 'none';
-      this._counter!.style.display = 'none';
     }
   }
 
@@ -360,24 +360,20 @@ export class FuzzySearchTool {
   private _setNoMatch() {
     this._state = { query: '', mode: 'auto', matches: [], currentIndex: -1 };
     this._counter!.textContent = '';
-    this._counter!.style.display = 'none';
     this._input!.classList.add('no-match');
+    this._navContainer!.style.display = 'none';
     this._prevButton!.setAttribute('disabled', '');
     this._nextButton!.setAttribute('disabled', '');
-    this._prevButton!.style.display = 'none';
-    this._nextButton!.style.display = 'none';
     this._recorder.highlight.clearHighlight();
   }
 
   private _clearSearch() {
     this._state = { query: '', mode: 'auto', matches: [], currentIndex: -1 };
     this._counter!.textContent = '';
-    this._counter!.style.display = 'none';
     this._input!.classList.remove('no-match');
+    this._navContainer!.style.display = 'none';
     this._prevButton!.setAttribute('disabled', '');
     this._nextButton!.setAttribute('disabled', '');
-    this._prevButton!.style.display = 'none';
-    this._nextButton!.style.display = 'none';
     this._recorder.highlight.clearHighlight();
   }
 

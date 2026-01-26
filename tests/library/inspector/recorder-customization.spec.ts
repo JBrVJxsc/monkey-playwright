@@ -1454,26 +1454,20 @@ test.describe('FuzzySearchTool', () => {
       await page.setContent(`<button>Click me</button>`);
       await page.waitForSelector('x-pw-glass');
 
-      // Initially, nav buttons and counter should be hidden (no search yet)
+      // Initially, nav container should be hidden (no search yet)
       const initialVisibility = await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
         if (!glass || !glass.shadowRoot)
           return { error: 'no glass' };
 
-        const counter = glass.shadowRoot.querySelector('x-pw-search-counter') as HTMLElement;
-        const prevBtn = glass.shadowRoot.querySelector('x-pw-search-nav-btn.prev') as HTMLElement;
-        const nextBtn = glass.shadowRoot.querySelector('x-pw-search-nav-btn.next') as HTMLElement;
+        const navContainer = glass.shadowRoot.querySelector('x-pw-search-nav') as HTMLElement;
 
         return {
-          counterHidden: counter?.style.display === 'none',
-          prevHidden: prevBtn?.style.display === 'none',
-          nextHidden: nextBtn?.style.display === 'none',
+          navContainerHidden: navContainer?.style.display === 'none',
         };
       });
 
-      expect(initialVisibility.counterHidden).toBe(true);
-      expect(initialVisibility.prevHidden).toBe(true);
-      expect(initialVisibility.nextHidden).toBe(true);
+      expect(initialVisibility.navContainerHidden).toBe(true);
 
       // Search for something that exists - buttons should become visible
       await page.evaluate(() => {
@@ -1492,21 +1486,16 @@ test.describe('FuzzySearchTool', () => {
         if (!glass || !glass.shadowRoot)
           return { error: 'no glass' };
 
+        const navContainer = glass.shadowRoot.querySelector('x-pw-search-nav') as HTMLElement;
         const counter = glass.shadowRoot.querySelector('x-pw-search-counter') as HTMLElement;
-        const prevBtn = glass.shadowRoot.querySelector('x-pw-search-nav-btn.prev') as HTMLElement;
-        const nextBtn = glass.shadowRoot.querySelector('x-pw-search-nav-btn.next') as HTMLElement;
 
         return {
-          counterVisible: counter?.style.display !== 'none',
-          prevVisible: prevBtn?.style.display !== 'none',
-          nextVisible: nextBtn?.style.display !== 'none',
+          navContainerVisible: navContainer?.style.display !== 'none',
           counterText: counter?.textContent,
         };
       });
 
-      expect(visibilityWithResults.counterVisible).toBe(true);
-      expect(visibilityWithResults.prevVisible).toBe(true);
-      expect(visibilityWithResults.nextVisible).toBe(true);
+      expect(visibilityWithResults.navContainerVisible).toBe(true);
       expect(visibilityWithResults.counterText).toBe('1/1');
 
       // Search for something that doesn't exist - buttons should be hidden again
@@ -1526,20 +1515,14 @@ test.describe('FuzzySearchTool', () => {
         if (!glass || !glass.shadowRoot)
           return { error: 'no glass' };
 
-        const counter = glass.shadowRoot.querySelector('x-pw-search-counter') as HTMLElement;
-        const prevBtn = glass.shadowRoot.querySelector('x-pw-search-nav-btn.prev') as HTMLElement;
-        const nextBtn = glass.shadowRoot.querySelector('x-pw-search-nav-btn.next') as HTMLElement;
+        const navContainer = glass.shadowRoot.querySelector('x-pw-search-nav') as HTMLElement;
 
         return {
-          counterHidden: counter?.style.display === 'none',
-          prevHidden: prevBtn?.style.display === 'none',
-          nextHidden: nextBtn?.style.display === 'none',
+          navContainerHidden: navContainer?.style.display === 'none',
         };
       });
 
-      expect(visibilityNoResults.counterHidden).toBe(true);
-      expect(visibilityNoResults.prevHidden).toBe(true);
-      expect(visibilityNoResults.nextHidden).toBe(true);
+      expect(visibilityNoResults.navContainerHidden).toBe(true);
 
       // Clear search with Escape - buttons should remain hidden
       await page.evaluate(() => {
@@ -1556,20 +1539,14 @@ test.describe('FuzzySearchTool', () => {
         if (!glass || !glass.shadowRoot)
           return { error: 'no glass' };
 
-        const counter = glass.shadowRoot.querySelector('x-pw-search-counter') as HTMLElement;
-        const prevBtn = glass.shadowRoot.querySelector('x-pw-search-nav-btn.prev') as HTMLElement;
-        const nextBtn = glass.shadowRoot.querySelector('x-pw-search-nav-btn.next') as HTMLElement;
+        const navContainer = glass.shadowRoot.querySelector('x-pw-search-nav') as HTMLElement;
 
         return {
-          counterHidden: counter?.style.display === 'none',
-          prevHidden: prevBtn?.style.display === 'none',
-          nextHidden: nextBtn?.style.display === 'none',
+          navContainerHidden: navContainer?.style.display === 'none',
         };
       });
 
-      expect(visibilityAfterClear.counterHidden).toBe(true);
-      expect(visibilityAfterClear.prevHidden).toBe(true);
-      expect(visibilityAfterClear.nextHidden).toBe(true);
+      expect(visibilityAfterClear.navContainerHidden).toBe(true);
     } finally {
       await browser.close();
     }
