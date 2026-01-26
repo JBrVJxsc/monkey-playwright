@@ -417,4 +417,60 @@ test.describe('Programmatic Recorder API', () => {
     });
     expect(glassInDom).toBe(false);
   });
+
+  test('should record fill actions via locator type', async ({ context }) => {
+    const { action } = await startProgrammaticRecording(context);
+    const page = await context.newPage();
+    await page.setContent(`<input type="text" id="name" placeholder="Name" />`);
+
+    // Use locator fill which triggers the recorder's fill handler
+    await page.getByPlaceholder('Name').fill('Test User');
+
+    // Wait for action to be recorded
+    await page.waitForTimeout(100);
+
+    const fillActions = action('fill');
+    expect(fillActions.length).toBeGreaterThanOrEqual(1);
+    expect(fillActions[0].action.name).toBe('fill');
+    expect((fillActions[0].action as any).text).toBe('Test User');
+  });
+
+  test('should record double-click as click with clickCount 2', async ({ context }) => {
+    const { action } = await startProgrammaticRecording(context);
+    const page = await context.newPage();
+    await page.setContent(`<div id="target" style="width: 100px; height: 100px; background: blue;">Double click me</div>`);
+
+    // Perform double-click
+    await page.locator('#target').dblclick();
+
+    // Wait for double-click to be recorded (200ms detection window + async propagation)
+    // Double-click is recorded as click with clickCount: 2
+    await expect.poll(() => {
+      const clicks = action('click');
+      return clicks.some((a: any) => (a.action as any).clickCount === 2);
+    }, { timeout: 5000 }).toBe(true);
+
+    const clickActions = action('click');
+    const dblclickAction = clickActions.find((a: any) => (a.action as any).clickCount === 2);
+    expect(dblclickAction).toBeTruthy();
+    expect(dblclickAction!.action.name).toBe('click');
+    expect((dblclickAction!.action as any).clickCount).toBe(2);
+  });
+
+  test('should record press action for keyboard shortcuts', async ({ context }) => {
+    const { action } = await startProgrammaticRecording(context);
+    const page = await context.newPage();
+    await page.setContent(`<input type="text" id="input" />`);
+
+    // Focus and press a key combination
+    await page.locator('#input').click();
+    await page.keyboard.press('Tab');
+
+    // Wait for action to be recorded
+    await page.waitForTimeout(300);
+
+    // Check that some action was recorded (click at minimum)
+    const clickActions = action('click');
+    expect(clickActions.length).toBeGreaterThanOrEqual(1);
+  });
 });

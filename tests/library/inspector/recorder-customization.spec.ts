@@ -2336,3 +2336,240 @@ test.describe('FuzzySearchTool', () => {
     }
   });
 });
+
+/**
+ * Error Handling Tests
+ *
+ * These tests verify graceful handling of invalid configurations
+ * and edge cases in the recorder customization system.
+ */
+test.describe('Error handling', () => {
+  test('should handle empty customization object', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      // Enable recorder with empty customization
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+        customization: {},
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button>Test</button>`);
+
+      await page.waitForSelector('x-pw-glass');
+
+      // Should work with all defaults
+      const overlayInfo = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        if (!glass || !glass.shadowRoot)
+          return { error: 'no glass' };
+
+        const overlay = glass.shadowRoot.querySelector('x-pw-overlay');
+        return {
+          hasOverlay: !!overlay,
+        };
+      });
+
+      expect(overlayInfo.hasOverlay).toBe(true);
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should handle partial customization with only highlightColors', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      // Enable recorder with only highlightColors (no elementFactories)
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+        customization: {
+          highlightColors: {
+            action: '#00ff007f',
+          },
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button>Test</button>`);
+
+      await page.waitForSelector('x-pw-glass');
+
+      // Should work with default factories but custom colors
+      const hasOverlay = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        return !!glass?.shadowRoot?.querySelector('x-pw-overlay');
+      });
+
+      expect(hasOverlay).toBe(true);
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should handle partial customization with only highlightCSS', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      // Enable recorder with only custom CSS
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+        customization: {
+          highlightCSS: `
+            x-pw-tooltip { background: purple !important; }
+          `,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button>Test</button>`);
+
+      await page.waitForSelector('x-pw-glass');
+
+      const hasOverlay = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        return !!glass?.shadowRoot?.querySelector('x-pw-overlay');
+      });
+
+      expect(hasOverlay).toBe(true);
+    } finally {
+      await browser.close();
+    }
+  });
+});
+
+/**
+ * Assertion Mode Tests
+ *
+ * These tests verify that assertion modes work correctly
+ * and can be toggled via the toolbar.
+ */
+test.describe('Assertion modes', () => {
+  test('should switch to assertingVisibility mode when toggle clicked', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button id="btn">Click me</button>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Switch to assertingVisibility mode by clicking the toggle
+      // The class is 'visibility' (not 'assert-visibility')
+      await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const toggle = glass?.shadowRoot?.querySelector('x-pw-tool-item.visibility');
+        (toggle as HTMLElement)?.click();
+      });
+
+      await page.waitForTimeout(100);
+
+      // Verify the toggle is now toggled (class is 'toggled' not 'active')
+      const isToggled = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const toggle = glass?.shadowRoot?.querySelector('x-pw-tool-item.visibility');
+        return toggle?.classList.contains('toggled');
+      });
+
+      expect(isToggled).toBe(true);
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should switch to assertingText mode when toggle clicked', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<p id="text">Hello World</p>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Switch to assertingText mode (class is 'text' not 'assert-text')
+      await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const toggle = glass?.shadowRoot?.querySelector('x-pw-tool-item.text');
+        (toggle as HTMLElement)?.click();
+      });
+
+      await page.waitForTimeout(100);
+
+      // Verify the toggle is now toggled
+      const isToggled = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const toggle = glass?.shadowRoot?.querySelector('x-pw-tool-item.text');
+        return toggle?.classList.contains('toggled');
+      });
+
+      expect(isToggled).toBe(true);
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should show dialog when clicking element in assertingText mode', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<p id="target">Hello World</p>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Switch to assertingText mode
+      await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const toggle = glass?.shadowRoot?.querySelector('x-pw-tool-item.text');
+        (toggle as HTMLElement)?.click();
+      });
+
+      await page.waitForTimeout(100);
+
+      // Click on target element - this should open the text assertion dialog
+      await page.locator('#target').click();
+
+      // Wait for dialog to appear
+      await page.waitForTimeout(300);
+
+      // Check if dialog appeared in the glass shadow DOM
+      const dialogInfo = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        if (!glass?.shadowRoot)
+          return { hasDialog: false };
+
+        const dialog = glass.shadowRoot.querySelector('x-pw-dialog');
+        return {
+          hasDialog: !!dialog,
+          dialogVisible: dialog ? (dialog as HTMLElement).style.display !== 'none' : false,
+        };
+      });
+
+      expect(dialogInfo.hasDialog).toBe(true);
+    } finally {
+      await browser.close();
+    }
+  });
+});
