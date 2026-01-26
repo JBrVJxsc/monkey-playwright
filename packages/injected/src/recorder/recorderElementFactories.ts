@@ -276,6 +276,39 @@ export interface ElementFactories {
    * @param direction - 'prev' or 'next'
    */
   createSearchNavButton?(doc: Document, direction: 'prev' | 'next'): HTMLElement;
+
+  // ============================================
+  // Pick Locator Dialog elements (OPTIONAL - custom implementations only)
+  // Default Playwright does not show pick locator dialog
+  // ============================================
+
+  /**
+   * Creates a row with label, value display, and copy button (optional).
+   * @param doc - Document to create element in
+   * @param label - Label text for the row (e.g., 'Locator', 'Aria Snapshot')
+   * @param value - The value to display and copy
+   */
+  createPickLocatorRow?(doc: Document, label: string, value: string): {
+    row: HTMLElement;
+    valueElement: HTMLElement;
+    copyButton: HTMLElement;
+  };
+
+  /**
+   * Creates the body content for pick locator dialog (optional - custom implementations only).
+   * This is used as the body element passed to the standard Dialog.show() method.
+   * @param doc - Document to create element in
+   * @param data - The locator and aria snapshot values
+   * @param factories - Reference to all factories for creating sub-elements
+   */
+  createPickLocatorBody?(
+    doc: Document,
+    data: {
+      locator: string;
+      ariaSnapshot: string;
+    },
+    factories: ElementFactories
+  ): HTMLElement;
 }
 
 /**

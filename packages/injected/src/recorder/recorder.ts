@@ -1717,6 +1717,7 @@ export class Recorder {
   readonly highlight: Highlight;
   readonly overlay: Overlay | undefined;
   private _stylesheet: CSSStyleSheet;
+  private _pickLocatorDialog: PickLocatorDialog;
   state: UIState = {
     mode: 'none',
     testIdAttributeName: 'data-testid',
@@ -1736,6 +1737,7 @@ export class Recorder {
     this.injectedScript = injectedScript;
     this.highlight = injectedScript.createHighlight();
     this.recorderMode = options?.recorderMode || 'default';
+    this._pickLocatorDialog = new PickLocatorDialog(this);
     // For pure 'api' mode, use JsonRecordActionTool (lightweight, no hover highlights)
     // For 'programmatic' and 'default' modes, use RecordActionTool (full UI interaction with hover highlights)
     const useJsonRecorder = this.recorderMode === 'api';
@@ -2212,7 +2214,20 @@ export class Recorder {
     const ariaSnapshot = this.injectedScript.ariaSnapshot(model.elements[0], {
       mode: 'expect',
     });
+
+    // Always send to delegate (existing behavior)
     void this._delegate.elementPicked?.({ selector, ariaSnapshot });
+
+    // Show dialog if custom factory is provided
+    const factories = getFactories();
+    if (factories.createPickLocatorBody) {
+      // Convert selector to locator string for display
+      const locatorString = this.injectedScript.utils.asLocator(
+          this.state.language,
+          selector,
+      );
+      this._pickLocatorDialog.show(locatorString, ariaSnapshot, model);
+    }
   }
 }
 
@@ -2321,6 +2336,59 @@ class Dialog {
         this._keyboardListener!,
     );
     this._dialogElement = null;
+  }
+}
+
+/**
+ * Pick Locator Dialog - shows locator and aria snapshot with copy buttons.
+ * Only displayed when custom factories are provided (e.g., from monkey-react).
+ * Default Playwright behavior does not include this dialog.
+ *
+ * Uses the same Dialog pattern as TextAssertionTool for consistent styling.
+ */
+class PickLocatorDialog {
+  private _recorder: Recorder;
+  private _dialog: Dialog;
+
+  constructor(recorder: Recorder) {
+    this._recorder = recorder;
+    this._dialog = new Dialog(recorder);
+  }
+
+  isShowing(): boolean {
+    return this._dialog.isShowing();
+  }
+
+  show(locator: string, ariaSnapshot: string, _model: HighlightModel) {
+    const factories = getFactories();
+
+    // Only show if custom factory is provided
+    if (!factories.createPickLocatorBody)
+      return;
+
+    // Create body content with locator and aria snapshot rows
+    const bodyElement = factories.createPickLocatorBody(
+        this._recorder.document,
+        { locator, ariaSnapshot },
+        factories,
+    );
+
+    // Show dialog using standard Dialog class
+    const dialogElement = this._dialog.show({
+      label: 'Picked Element',
+      body: bodyElement,
+    });
+
+    // Position near the highlighted element (same as assert text dialog)
+    const anchorBox = this._recorder.highlight.firstBox();
+    if (anchorBox) {
+      const position = this._recorder.highlight.tooltipPosition(anchorBox, dialogElement);
+      this._dialog.moveTo(position.anchorTop, position.anchorLeft);
+    }
+  }
+
+  close() {
+    this._dialog.close();
   }
 }
 

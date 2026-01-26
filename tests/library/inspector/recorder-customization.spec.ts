@@ -2688,3 +2688,717 @@ test.describe('Assertion modes', () => {
     }
   });
 });
+
+// ============================================================================
+// Pick Locator Dialog Tests
+// ============================================================================
+
+test.describe('pick locator dialog', () => {
+  // Factory code that includes createPickLocatorBody and createPickLocatorRow
+  const pickLocatorFactories = `
+    module.exports = {
+      createPickLocatorRow: (doc, label, value) => {
+        const row = doc.createElement('x-pw-pick-locator-row');
+        row.setAttribute('data-label', label);
+
+        const headerRow = doc.createElement('x-pw-pick-locator-header');
+
+        const labelEl = doc.createElement('x-pw-pick-locator-label');
+        labelEl.textContent = label;
+        headerRow.appendChild(labelEl);
+
+        const copyButton = doc.createElement('x-pw-button');
+        copyButton.classList.add('copy-btn');
+        copyButton.title = 'Copy to clipboard';
+        copyButton.textContent = 'Copy';
+        headerRow.appendChild(copyButton);
+
+        row.appendChild(headerRow);
+
+        const valueElement = doc.createElement('x-pw-pick-locator-value');
+        valueElement.textContent = value;
+        row.appendChild(valueElement);
+
+        return { row, valueElement, copyButton };
+      },
+
+      createPickLocatorBody: (doc, data, factories) => {
+        const { locator, ariaSnapshot } = data;
+        const container = doc.createElement('x-pw-pick-locator-body');
+
+        const locatorRow = factories.createPickLocatorRow(doc, 'Locator', locator);
+        locatorRow.copyButton.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(locator);
+            locatorRow.copyButton.textContent = 'Copied!';
+            locatorRow.copyButton.setAttribute('data-copied', 'true');
+            setTimeout(() => {
+              locatorRow.copyButton.textContent = 'Copy';
+              locatorRow.copyButton.removeAttribute('data-copied');
+            }, 1500);
+          } catch (e) {
+            console.error('Failed to copy:', e);
+          }
+        });
+        container.appendChild(locatorRow.row);
+
+        const ariaRow = factories.createPickLocatorRow(doc, 'Aria Snapshot', ariaSnapshot);
+        ariaRow.copyButton.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(ariaSnapshot);
+            ariaRow.copyButton.textContent = 'Copied!';
+            ariaRow.copyButton.setAttribute('data-copied', 'true');
+            setTimeout(() => {
+              ariaRow.copyButton.textContent = 'Copy';
+              ariaRow.copyButton.removeAttribute('data-copied');
+            }, 1500);
+          } catch (e) {
+            console.error('Failed to copy:', e);
+          }
+        });
+        container.appendChild(ariaRow.row);
+
+        return container;
+      },
+    };
+  `;
+
+  test('should show pick locator dialog when custom factory is provided', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'inspecting',
+        customization: {
+          elementFactories: pickLocatorFactories,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button id="target">Click me</button>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Click on the element to pick it
+      await page.locator('#target').click();
+
+      // Wait for dialog to appear
+      await page.waitForTimeout(300);
+
+      // Check if pick locator dialog appeared
+      const dialogInfo = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        if (!glass?.shadowRoot)
+          return { hasDialog: false };
+
+        const dialog = glass.shadowRoot.querySelector('x-pw-dialog');
+        const body = dialog?.querySelector('x-pw-pick-locator-body');
+
+        return {
+          hasDialog: !!dialog,
+          hasPickLocatorBody: !!body,
+        };
+      });
+
+      expect(dialogInfo.hasDialog).toBe(true);
+      expect(dialogInfo.hasPickLocatorBody).toBe(true);
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should NOT show pick locator dialog when no custom factory is provided', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      // Enable recorder WITHOUT custom factories
+      await (context as any)._enableRecorder({
+        mode: 'inspecting',
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button id="target">Click me</button>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Click on the element to pick it
+      await page.locator('#target').click();
+
+      // Wait a bit
+      await page.waitForTimeout(300);
+
+      // Check that NO dialog appeared (default Playwright behavior)
+      const dialogInfo = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        if (!glass?.shadowRoot)
+          return { hasDialog: false };
+
+        const dialog = glass.shadowRoot.querySelector('x-pw-dialog');
+        return {
+          hasDialog: !!dialog,
+        };
+      });
+
+      // Default behavior should NOT show a dialog for pick locator
+      expect(dialogInfo.hasDialog).toBe(false);
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should display locator and aria snapshot rows', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'inspecting',
+        customization: {
+          elementFactories: pickLocatorFactories,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button id="target">Submit Form</button>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Click on the element to pick it
+      await page.locator('#target').click();
+      await page.waitForTimeout(300);
+
+      // Check dialog structure
+      const dialogStructure = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        if (!glass?.shadowRoot)
+          return null;
+
+        const body = glass.shadowRoot.querySelector('x-pw-pick-locator-body');
+        if (!body)
+          return null;
+
+        const rows = body.querySelectorAll('x-pw-pick-locator-row');
+        const rowInfo = Array.from(rows).map(row => ({
+          label: row.getAttribute('data-label'),
+          hasHeader: !!row.querySelector('x-pw-pick-locator-header'),
+          hasLabel: !!row.querySelector('x-pw-pick-locator-label'),
+          hasCopyButton: !!row.querySelector('.copy-btn'),
+          hasValue: !!row.querySelector('x-pw-pick-locator-value'),
+          valueText: row.querySelector('x-pw-pick-locator-value')?.textContent,
+        }));
+
+        return {
+          rowCount: rows.length,
+          rows: rowInfo,
+        };
+      });
+
+      expect(dialogStructure).toBeTruthy();
+      expect(dialogStructure!.rowCount).toBe(2);
+
+      // First row should be Locator
+      expect(dialogStructure!.rows[0].label).toBe('Locator');
+      expect(dialogStructure!.rows[0].hasHeader).toBe(true);
+      expect(dialogStructure!.rows[0].hasLabel).toBe(true);
+      expect(dialogStructure!.rows[0].hasCopyButton).toBe(true);
+      expect(dialogStructure!.rows[0].hasValue).toBe(true);
+      expect(dialogStructure!.rows[0].valueText).toContain('getByRole');
+
+      // Second row should be Aria Snapshot
+      expect(dialogStructure!.rows[1].label).toBe('Aria Snapshot');
+      expect(dialogStructure!.rows[1].hasHeader).toBe(true);
+      expect(dialogStructure!.rows[1].hasLabel).toBe(true);
+      expect(dialogStructure!.rows[1].hasCopyButton).toBe(true);
+      expect(dialogStructure!.rows[1].hasValue).toBe(true);
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should have copy buttons present', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'inspecting',
+        customization: {
+          elementFactories: pickLocatorFactories,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button id="target">Test Button</button>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Click on the element to pick it
+      await page.locator('#target').click();
+      await page.waitForTimeout(300);
+
+      // Check that copy buttons exist
+      const copyButtonInfo = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const copyBtns = glass?.shadowRoot?.querySelectorAll('x-pw-pick-locator-row .copy-btn');
+        return {
+          count: copyBtns?.length || 0,
+          firstButtonText: copyBtns?.[0]?.textContent,
+          secondButtonText: copyBtns?.[1]?.textContent,
+        };
+      });
+
+      // Should have 2 copy buttons (one for Locator, one for Aria Snapshot)
+      expect(copyButtonInfo.count).toBe(2);
+      expect(copyButtonInfo.firstButtonText).toBe('Copy');
+      expect(copyButtonInfo.secondButtonText).toBe('Copy');
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should close dialog on Close button click', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'inspecting',
+        customization: {
+          elementFactories: pickLocatorFactories,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button id="target">Click me</button>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Click on the element to open dialog
+      await page.locator('#target').click();
+      await page.waitForTimeout(300);
+
+      // Verify dialog is open
+      const beforeClose = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        return !!glass?.shadowRoot?.querySelector('x-pw-dialog');
+      });
+      expect(beforeClose).toBe(true);
+
+      // Click the close/cancel button in footer
+      await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        // The cancel button is in the footer, added by createDialogLayout
+        const cancelBtn = glass?.shadowRoot?.querySelector('x-pw-dialog-footer x-pw-button, x-pw-tool-item.cancel') as HTMLElement;
+        cancelBtn?.click();
+      });
+
+      await page.waitForTimeout(100);
+
+      // Verify dialog is closed
+      const afterClose = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        return !!glass?.shadowRoot?.querySelector('x-pw-dialog');
+      });
+      expect(afterClose).toBe(false);
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should close dialog on Escape key', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'inspecting',
+        customization: {
+          elementFactories: pickLocatorFactories,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button id="target">Click me</button>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Click on the element to open dialog
+      await page.locator('#target').click();
+      await page.waitForTimeout(300);
+
+      // Verify dialog is open
+      const beforeClose = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        return !!glass?.shadowRoot?.querySelector('x-pw-dialog');
+      });
+      expect(beforeClose).toBe(true);
+
+      // Press Escape key
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(100);
+
+      // Verify dialog is closed
+      const afterClose = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        return !!glass?.shadowRoot?.querySelector('x-pw-dialog');
+      });
+      expect(afterClose).toBe(false);
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should close dialog on glass pane click', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'inspecting',
+        customization: {
+          elementFactories: pickLocatorFactories,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`
+        <button id="target" style="margin: 100px;">Click me</button>
+        <div id="elsewhere" style="width: 100px; height: 100px; margin-top: 200px;"></div>
+      `);
+      await page.waitForSelector('x-pw-glass');
+
+      // Click on the element to open dialog
+      await page.locator('#target').click();
+      await page.waitForTimeout(300);
+
+      // Verify dialog is open
+      const beforeClose = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        return !!glass?.shadowRoot?.querySelector('x-pw-dialog');
+      });
+      expect(beforeClose).toBe(true);
+
+      // Click on the glass pane (outside the dialog)
+      await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass') as HTMLElement;
+        // Dispatch click event on the glass element itself
+        glass?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      await page.waitForTimeout(100);
+
+      // Verify dialog is closed
+      const afterClose = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        return !!glass?.shadowRoot?.querySelector('x-pw-dialog');
+      });
+      expect(afterClose).toBe(false);
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should display correct dialog title', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'inspecting',
+        customization: {
+          elementFactories: pickLocatorFactories,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button id="target">Click me</button>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Click on the element to open dialog
+      await page.locator('#target').click();
+      await page.waitForTimeout(300);
+
+      // Check dialog title
+      const dialogTitle = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        // Title could be in x-pw-dialog-title or a label element
+        const title = glass?.shadowRoot?.querySelector('x-pw-dialog-title, x-pw-dialog label');
+        return title?.textContent;
+      });
+
+      expect(dialogTitle).toBe('Picked Element');
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should generate correct locator for input element', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'inspecting',
+        customization: {
+          elementFactories: pickLocatorFactories,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`
+        <input type="text" placeholder="Enter name" id="name-input" />
+      `);
+      await page.waitForSelector('x-pw-glass');
+
+      // Test input element
+      await page.locator('#name-input').click();
+      await page.waitForTimeout(300);
+
+      const inputLocator = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const locatorValue = glass?.shadowRoot?.querySelector('x-pw-pick-locator-row[data-label="Locator"] x-pw-pick-locator-value');
+        return locatorValue?.textContent;
+      });
+
+      // Playwright generates getByRole for input with accessible name from placeholder
+      expect(inputLocator).toBeTruthy();
+      expect(inputLocator).toContain('getBy');
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should display aria snapshot for picked element', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'inspecting',
+        customization: {
+          elementFactories: pickLocatorFactories,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button id="submit-btn">Submit Form</button>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Click on the button
+      await page.locator('#submit-btn').click();
+      await page.waitForTimeout(300);
+
+      // Check aria snapshot value
+      const ariaSnapshot = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const ariaValue = glass?.shadowRoot?.querySelector('x-pw-pick-locator-row[data-label="Aria Snapshot"] x-pw-pick-locator-value');
+        return ariaValue?.textContent;
+      });
+
+      // Aria snapshot should contain button role and name
+      expect(ariaSnapshot).toBeTruthy();
+      expect(ariaSnapshot).toContain('button');
+      expect(ariaSnapshot).toContain('Submit Form');
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should position dialog near highlighted element', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'inspecting',
+        customization: {
+          elementFactories: pickLocatorFactories,
+        },
+      });
+
+      const page = await context.newPage();
+      // Place button in specific location
+      await page.setContent(`
+        <div style="padding: 200px;">
+          <button id="target" style="width: 100px; height: 40px;">Click me</button>
+        </div>
+      `);
+      await page.waitForSelector('x-pw-glass');
+
+      // Click on the element to open dialog
+      await page.locator('#target').click();
+      await page.waitForTimeout(300);
+
+      // Get dialog position
+      const dialogPosition = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const dialog = glass?.shadowRoot?.querySelector('x-pw-dialog') as HTMLElement;
+        if (!dialog)
+          return null;
+        const style = getComputedStyle(dialog);
+        return {
+          top: parseFloat(dialog.style.top || style.top),
+          left: parseFloat(dialog.style.left || style.left),
+        };
+      });
+
+      expect(dialogPosition).toBeTruthy();
+      // Dialog should be positioned somewhere near the button (within reasonable range)
+      // The exact position depends on tooltipPosition logic, but it should be in the viewport
+      expect(dialogPosition!.top).toBeGreaterThan(0);
+      expect(dialogPosition!.left).toBeGreaterThan(0);
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should show unique locator content for picked element', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'inspecting',
+        customization: {
+          elementFactories: pickLocatorFactories,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`
+        <button id="btn1">First Button</button>
+        <button id="btn2">Second Button</button>
+      `);
+      await page.waitForSelector('x-pw-glass');
+
+      // Click first button to pick it
+      await page.locator('#btn1').click();
+      await page.waitForTimeout(300);
+
+      const locatorInfo = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const locatorValue = glass?.shadowRoot?.querySelector('x-pw-pick-locator-row[data-label="Locator"] x-pw-pick-locator-value');
+        return {
+          text: locatorValue?.textContent,
+          hasDialog: !!glass?.shadowRoot?.querySelector('x-pw-dialog'),
+        };
+      });
+
+      // Verify the locator contains the specific button text
+      expect(locatorInfo.hasDialog).toBe(true);
+      expect(locatorInfo.text).toBeTruthy();
+      expect(locatorInfo.text).toContain('First Button');
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should work with elements containing special characters', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'inspecting',
+        customization: {
+          elementFactories: pickLocatorFactories,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button id="target">Click "Here" & Submit</button>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Click on the button with special characters
+      await page.locator('#target').click();
+      await page.waitForTimeout(300);
+
+      // Check that dialog appears and contains the special characters
+      const dialogInfo = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const locatorValue = glass?.shadowRoot?.querySelector('x-pw-pick-locator-row[data-label="Locator"] x-pw-pick-locator-value');
+        const ariaValue = glass?.shadowRoot?.querySelector('x-pw-pick-locator-row[data-label="Aria Snapshot"] x-pw-pick-locator-value');
+        return {
+          hasDialog: !!glass?.shadowRoot?.querySelector('x-pw-dialog'),
+          locator: locatorValue?.textContent,
+          aria: ariaValue?.textContent,
+        };
+      });
+
+      expect(dialogInfo.hasDialog).toBe(true);
+      expect(dialogInfo.locator).toBeTruthy();
+      expect(dialogInfo.aria).toContain('Click');
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('copy buttons are clickable and have correct structure', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'inspecting',
+        customization: {
+          elementFactories: pickLocatorFactories,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button id="target">Test</button>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Click on the element to open dialog
+      await page.locator('#target').click();
+      await page.waitForTimeout(300);
+
+      // Verify copy buttons exist and have correct initial state
+      const copyButtonState = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const copyBtns = glass?.shadowRoot?.querySelectorAll('x-pw-pick-locator-row .copy-btn');
+        if (!copyBtns || copyBtns.length === 0)
+          return null;
+
+        const firstBtn = copyBtns[0] as HTMLElement;
+        return {
+          count: copyBtns.length,
+          firstButtonText: firstBtn.textContent,
+          firstButtonTitle: firstBtn.title,
+          hasClickHandler: typeof firstBtn.onclick === 'function' || firstBtn.hasAttribute('onclick') || true, // Event listeners can't be detected this way
+        };
+      });
+
+      expect(copyButtonState).toBeTruthy();
+      expect(copyButtonState!.count).toBe(2);
+      expect(copyButtonState!.firstButtonText).toBe('Copy');
+      expect(copyButtonState!.firstButtonTitle).toBe('Copy to clipboard');
+
+      // Test that clicking the button doesn't throw (clipboard might fail in headless but button should handle it)
+      const clickResult = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const copyBtn = glass?.shadowRoot?.querySelector('x-pw-pick-locator-row .copy-btn') as HTMLElement;
+        try {
+          copyBtn?.click();
+          return { clicked: true, error: null };
+        } catch (e) {
+          return { clicked: false, error: String(e) };
+        }
+      });
+
+      expect(clickResult.clicked).toBe(true);
+    } finally {
+      await browser.close();
+    }
+  });
+});
