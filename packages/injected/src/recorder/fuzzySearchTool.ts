@@ -23,10 +23,9 @@
  * ## Features
  * - Multiple search modes: locator, aria template, text content, auto
  * - Real-time highlighting of matched elements
- * - Navigation through matches (Enter/Shift+Enter or buttons)
- * - Current match highlighted in different color
- * - Match counter (e.g., "2/5")
- * - Auto-scroll to current match
+ * - Match counter (e.g., "1/5")
+ * - Auto-scroll to first match
+ * - Collapsible UI: icon when inactive, expands on hover/focus
  *
  * ## Integration
  * The FuzzySearchTool is conditionally instantiated in the Overlay class only when
@@ -93,20 +92,18 @@ function removeEventListeners(listeners: (() => void)[]) {
  * - Auto mode (tries locator first, falls back to text)
  *
  * Features:
+ * - Collapsible UI (icon when collapsed, expands on hover/focus/has-value)
  * - Real-time highlighting of matched elements
- * - Navigation through matches (Enter/Shift+Enter or buttons)
- * - Current match highlighted in different color
- * - Match counter (e.g., "2 of 5")
- * - Auto-scroll to current match
+ * - Match counter (e.g., "1/5")
+ * - Auto-scroll to first match
  */
 export class FuzzySearchTool {
   private _recorder: Recorder;
   private _container: HTMLElement | null = null;
+  private _trigger: HTMLElement | null = null;
+  private _expandable: HTMLElement | null = null;
   private _input: HTMLTextAreaElement | null = null;
-  private _navContainer: HTMLElement | null = null;
   private _counter: HTMLElement | null = null;
-  private _prevButton: HTMLElement | null = null;
-  private _nextButton: HTMLElement | null = null;
   private _debounceTimer: number | undefined;
   private _textCache = new Map<Element | ShadowRoot, ElementText>();
   private _state: SearchState = {
@@ -129,72 +126,94 @@ export class FuzzySearchTool {
     // The Overlay constructor checks factories.createSearchContainer before calling this.
     // Using non-null assertions (!) because we know these factories exist.
 
-    // Create search container - don't let it expand, remove min-width constraint
+    // Create search container (handles hover state for expand/collapse)
     this._container = factories.createSearchContainer!(doc);
-    this._container.style.flex = 'none';
-    this._container.style.minWidth = '0';
-    this._container.style.maxWidth = 'none';
 
-    // Search input - fixed width so toolbar expands/shrinks when nav appears/disappears
+    // Create trigger icon (visible when collapsed)
+    if (factories.createSearchTrigger) {
+      this._trigger = factories.createSearchTrigger(doc);
+      this._container.appendChild(this._trigger);
+    }
+
+    // Create expandable wrapper (contains input + counter, expands on hover/focus)
+    if (factories.createSearchExpandable) {
+      this._expandable = factories.createSearchExpandable(doc);
+    } else {
+      // Fallback: create a simple div wrapper if factory not provided
+      this._expandable = doc.createElement('x-pw-search-expandable');
+    }
+
+    // Search input
     this._input = factories.createSearchInput!(doc);
-    this._input.style.flex = 'none';
-    this._input.style.width = '150px';
-    this._container.appendChild(this._input);
+    this._expandable.appendChild(this._input);
 
-    // Navigation controls - hidden by default, shown when results exist
-    this._navContainer = factories.createSearchNav!(doc);
-    this._navContainer.style.display = 'none'; // Hidden until results found
+    // Match counter (hidden when empty via CSS)
+    if (factories.createSearchCounter) {
+      this._counter = factories.createSearchCounter(doc);
+      this._counter.textContent = '';
+      this._expandable.appendChild(this._counter);
+    }
 
-    this._counter = factories.createSearchCounter!(doc);
-    this._counter.textContent = '';
-    this._navContainer.appendChild(this._counter);
-
-    this._prevButton = factories.createSearchNavButton!(doc, 'prev');
-    this._prevButton.setAttribute('disabled', '');
-    this._navContainer.appendChild(this._prevButton);
-
-    this._nextButton = factories.createSearchNavButton!(doc, 'next');
-    this._nextButton.setAttribute('disabled', '');
-    this._navContainer.appendChild(this._nextButton);
-
-    this._container.appendChild(this._navContainer);
+    this._container.appendChild(this._expandable);
     toolsListElement.appendChild(this._container);
 
     // Set up event listeners
     this._listeners = [
       addEventListener(this._input, 'input', () => this._onSearchInput()),
+      addEventListener(this._input, 'input', () => this._updateHasValueClass()),
       addEventListener(this._input, 'keydown', e =>
         this._onKeyDown(e as KeyboardEvent),
       ),
-      addEventListener(this._prevButton, 'click', () => this._navigatePrev()),
-      addEventListener(this._nextButton, 'click', () => this._navigateNext()),
     ];
+
+    // Focus input when trigger is clicked (for keyboard accessibility)
+    if (this._trigger) {
+      this._listeners.push(
+          addEventListener(this._trigger, 'click', () => {
+            this._input?.focus();
+          }),
+      );
+    }
+  }
+
+  /**
+   * Updates the has-value class on container based on input content.
+   * This keeps the search expanded when there's a value, even without hover/focus.
+   */
+  private _updateHasValueClass() {
+    if (!this._container || !this._input)
+      return;
+    const hasValue = this._input.value.trim().length > 0;
+    this._container.classList.toggle('has-value', hasValue);
+  }
+
+  /**
+   * Updates the has-results class on container based on match count.
+   * This expands the search wider to show the counter when results exist.
+   */
+  private _updateHasResultsClass() {
+    if (!this._container)
+      return;
+    const hasResults = this._state.matches.length > 0;
+    this._container.classList.toggle('has-results', hasResults);
   }
 
   private _onKeyDown(e: KeyboardEvent) {
     e.stopPropagation(); // Prevent recorder from capturing keystrokes
 
-    switch (e.key) {
-      case 'Enter':
-        e.preventDefault();
-        if (e.shiftKey)
-          this._navigatePrev();
-        else
-          this._navigateNext();
+    if (e.key === 'Escape') {
+      this._input!.value = '';
+      this._clearSearch();
+      return;
+    }
 
-        break;
-      case 'Escape':
-        this._input!.value = '';
-        this._clearSearch();
-        break;
-      case 'F3':
-        e.preventDefault();
-        if (e.shiftKey)
-          this._navigatePrev();
-        else
-          this._navigateNext();
-
-        break;
+    // Navigation with Enter/Shift+Enter or F3/Shift+F3
+    if (e.key === 'Enter' || e.key === 'F3') {
+      e.preventDefault(); // Prevent form submission or browser find
+      if (e.shiftKey)
+        this._navigatePrev();
+      else
+        this._navigateNext();
     }
   }
 
@@ -260,32 +279,6 @@ export class FuzzySearchTool {
 
   }
 
-  private _navigateNext() {
-    if (this._state.matches.length === 0)
-      return;
-
-    // Cycle to next (wrap around)
-    this._state.currentIndex =
-      (this._state.currentIndex + 1) % this._state.matches.length;
-    this._updateUI();
-    this._updateHighlight();
-    this._scrollToCurrentMatch();
-  }
-
-  private _navigatePrev() {
-    if (this._state.matches.length === 0)
-      return;
-
-    // Cycle to previous (wrap around)
-    this._state.currentIndex =
-      this._state.currentIndex <= 0
-        ? this._state.matches.length - 1
-        : this._state.currentIndex - 1;
-    this._updateUI();
-    this._updateHighlight();
-    this._scrollToCurrentMatch();
-  }
-
   private _scrollToCurrentMatch() {
     const currentElement = this._state.matches[this._state.currentIndex];
     if (currentElement) {
@@ -297,33 +290,48 @@ export class FuzzySearchTool {
     }
   }
 
+  private _navigateNext() {
+    if (this._state.matches.length === 0)
+      return;
+    this._state.currentIndex =
+      (this._state.currentIndex + 1) % this._state.matches.length;
+    this._updateUI();
+    this._updateHighlight();
+    this._scrollToCurrentMatch();
+  }
+
+  private _navigatePrev() {
+    if (this._state.matches.length === 0)
+      return;
+    this._state.currentIndex =
+      (this._state.currentIndex - 1 + this._state.matches.length) %
+      this._state.matches.length;
+    this._updateUI();
+    this._updateHighlight();
+    this._scrollToCurrentMatch();
+  }
+
   private _updateUI() {
     const { matches, currentIndex } = this._state;
-    const hasMatches = matches.length > 0;
 
     // Update counter (compact format: "1/5") and input state
     if (matches.length === 0 && this._input?.value.trim()) {
       // No matches - just show ring on input, keep counter empty
-      this._counter!.textContent = '';
+      if (this._counter)
+        this._counter.textContent = '';
       this._input!.classList.add('no-match');
     } else if (matches.length > 0) {
-      this._counter!.textContent = `${currentIndex + 1}/${matches.length}`;
+      if (this._counter)
+        this._counter.textContent = `${currentIndex + 1}/${matches.length}`;
       this._input!.classList.remove('no-match');
     } else {
-      this._counter!.textContent = '';
+      if (this._counter)
+        this._counter.textContent = '';
       this._input!.classList.remove('no-match');
     }
 
-    // Update navigation container - hide when no results, show when results exist
-    if (hasMatches) {
-      this._navContainer!.style.display = '';
-      this._prevButton!.removeAttribute('disabled');
-      this._nextButton!.removeAttribute('disabled');
-    } else {
-      this._navContainer!.style.display = 'none';
-      this._prevButton!.setAttribute('disabled', '');
-      this._nextButton!.setAttribute('disabled', '');
-    }
+    // Update container class for CSS width animation
+    this._updateHasResultsClass();
   }
 
   private _updateHighlight() {
@@ -359,22 +367,22 @@ export class FuzzySearchTool {
 
   private _setNoMatch() {
     this._state = { query: '', mode: 'auto', matches: [], currentIndex: -1 };
-    this._counter!.textContent = '';
+    if (this._counter)
+      this._counter.textContent = '';
     this._input!.classList.add('no-match');
-    this._navContainer!.style.display = 'none';
-    this._prevButton!.setAttribute('disabled', '');
-    this._nextButton!.setAttribute('disabled', '');
     this._recorder.highlight.clearHighlight();
+    this._updateHasValueClass();
+    this._updateHasResultsClass();
   }
 
   private _clearSearch() {
     this._state = { query: '', mode: 'auto', matches: [], currentIndex: -1 };
-    this._counter!.textContent = '';
+    if (this._counter)
+      this._counter.textContent = '';
     this._input!.classList.remove('no-match');
-    this._navContainer!.style.display = 'none';
-    this._prevButton!.setAttribute('disabled', '');
-    this._nextButton!.setAttribute('disabled', '');
     this._recorder.highlight.clearHighlight();
+    this._updateHasValueClass();
+    this._updateHasResultsClass();
   }
 
   private _detectSearchMode(query: string): {

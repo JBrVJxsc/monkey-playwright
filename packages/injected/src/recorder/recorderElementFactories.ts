@@ -256,26 +256,32 @@ export interface ElementFactories {
   // Search elements (fuzzy search in toolbar)
   // These are OPTIONAL - only provided by custom implementations
   // Default Playwright does not include search UI in the toolbar
+  //
+  // Collapsible Design:
+  // - Default: collapsed (only trigger icon visible)
+  // - Hover/focus/has-value: expanded (full input + counter)
   // ============================================
 
   /** Creates search container wrapper (optional - custom implementations only) */
   createSearchContainer?(doc: Document): HTMLElement;
 
+  /**
+   * Creates the search trigger icon button (optional - custom implementations only).
+   * Visible when search is collapsed; hidden when expanded.
+   */
+  createSearchTrigger?(doc: Document): HTMLElement;
+
+  /**
+   * Creates the expandable wrapper for input and counter (optional - custom implementations only).
+   * Contains the input and counter; expands on hover/focus/has-value.
+   */
+  createSearchExpandable?(doc: Document): HTMLElement;
+
   /** Creates the search textarea for multi-line queries (optional - custom implementations only) */
   createSearchInput?(doc: Document): HTMLTextAreaElement;
 
-  /** Creates the navigation controls container (optional - custom implementations only) */
-  createSearchNav?(doc: Document): HTMLElement;
-
   /** Creates the match counter display (optional - custom implementations only) */
   createSearchCounter?(doc: Document): HTMLElement;
-
-  /**
-   * Creates a navigation button (optional - custom implementations only).
-   * @param doc - Document to create element in
-   * @param direction - 'prev' or 'next'
-   */
-  createSearchNavButton?(doc: Document, direction: 'prev' | 'next'): HTMLElement;
 
   // ============================================
   // Pick Locator Dialog elements (OPTIONAL - custom implementations only)

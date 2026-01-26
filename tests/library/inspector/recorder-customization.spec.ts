@@ -1319,18 +1319,33 @@ test.describe('createToolIcon factory customization', () => {
  * Key features tested:
  * - Search UI only appears when custom factories include createSearchContainer
  * - Multiple search modes: locator, text, aria, auto
- * - Match highlighting and navigation
+ * - Match highlighting with counter display
  * - No-match state indication
- * - Keyboard navigation (Enter, Shift+Enter, Escape, F3)
+ * - Collapsible UI (trigger icon, expandable input area)
+ * - CSS classes for state management (has-value, has-results)
  *
  * See packages/injected/src/recorder/fuzzySearchTool.ts for implementation.
  */
 test.describe('FuzzySearchTool', () => {
   // Search factory definitions for all tests
+  // Updated for collapsible UI: trigger icon + expandable wrapper
   const searchFactories = `
     module.exports = {
       createSearchContainer: (doc) => {
         const el = doc.createElement('x-pw-search-container');
+        return el;
+      },
+      createSearchTrigger: (doc) => {
+        const el = doc.createElement('x-pw-search-trigger');
+        el.title = 'Search elements';
+        // Simple icon placeholder for testing
+        const icon = doc.createElement('x-div');
+        icon.classList.add('search-icon');
+        el.appendChild(icon);
+        return el;
+      },
+      createSearchExpandable: (doc) => {
+        const el = doc.createElement('x-pw-search-expandable');
         return el;
       },
       createSearchInput: (doc) => {
@@ -1341,18 +1356,8 @@ test.describe('FuzzySearchTool', () => {
         el.setAttribute('rows', '1');
         return el;
       },
-      createSearchNav: (doc) => {
-        const el = doc.createElement('x-pw-search-nav');
-        return el;
-      },
       createSearchCounter: (doc) => {
         const el = doc.createElement('x-pw-search-counter');
-        return el;
-      },
-      createSearchNavButton: (doc, direction) => {
-        const el = doc.createElement('x-pw-search-nav-btn');
-        el.classList.add(direction);
-        el.textContent = direction === 'prev' ? '↑' : '↓';
         return el;
       },
     };
@@ -1404,40 +1409,42 @@ test.describe('FuzzySearchTool', () => {
       await page.setContent(`<button>Click me</button>`);
       await page.waitForSelector('x-pw-glass');
 
-      // Check that search UI is present
+      // Check that search UI is present with collapsible structure
       const searchUIInfo = await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
         if (!glass || !glass.shadowRoot)
           return { error: 'no glass' };
 
         const container = glass.shadowRoot.querySelector('x-pw-search-container');
+        const trigger = glass.shadowRoot.querySelector('x-pw-search-trigger');
+        const expandable = glass.shadowRoot.querySelector('x-pw-search-expandable');
         const input = glass.shadowRoot.querySelector('.x-pw-search-input');
         const counter = glass.shadowRoot.querySelector('x-pw-search-counter');
-        const prevBtn = glass.shadowRoot.querySelector('x-pw-search-nav-btn.prev');
-        const nextBtn = glass.shadowRoot.querySelector('x-pw-search-nav-btn.next');
 
         return {
           hasContainer: !!container,
+          hasTrigger: !!trigger,
+          hasExpandable: !!expandable,
           hasInput: !!input,
           hasCounter: !!counter,
-          hasPrevBtn: !!prevBtn,
-          hasNextBtn: !!nextBtn,
+          triggerTitle: trigger?.getAttribute('title'),
           inputPlaceholder: (input as HTMLTextAreaElement)?.placeholder,
         };
       });
 
       expect(searchUIInfo.hasContainer).toBe(true);
+      expect(searchUIInfo.hasTrigger).toBe(true);
+      expect(searchUIInfo.hasExpandable).toBe(true);
       expect(searchUIInfo.hasInput).toBe(true);
       expect(searchUIInfo.hasCounter).toBe(true);
-      expect(searchUIInfo.hasPrevBtn).toBe(true);
-      expect(searchUIInfo.hasNextBtn).toBe(true);
+      expect(searchUIInfo.triggerTitle).toBe('Search elements');
       expect(searchUIInfo.inputPlaceholder).toBe('Find elements...');
     } finally {
       await browser.close();
     }
   });
 
-  test('should hide nav buttons and counter when no search results', async () => {
+  test('should focus input when trigger is clicked', async () => {
     const playwright = createInProcessPlaywright();
     const browser = await playwright.chromium.launch({ headless: true });
     const context = await browser.newContext();
@@ -1454,22 +1461,65 @@ test.describe('FuzzySearchTool', () => {
       await page.setContent(`<button>Click me</button>`);
       await page.waitForSelector('x-pw-glass');
 
-      // Initially, nav container should be hidden (no search yet)
-      const initialVisibility = await page.evaluate(() => {
+      // Click the trigger icon
+      await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const trigger = glass?.shadowRoot?.querySelector('x-pw-search-trigger') as HTMLElement;
+        trigger?.click();
+      });
+
+      await page.waitForTimeout(100);
+
+      // Check that input is now focused
+      const inputIsFocused = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        if (!glass || !glass.shadowRoot)
+          return false;
+        const input = glass.shadowRoot.querySelector('.x-pw-search-input');
+        return glass.shadowRoot.activeElement === input;
+      });
+
+      expect(inputIsFocused).toBe(true);
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should manage has-value and has-results CSS classes on container', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+        customization: {
+          elementFactories: searchFactories,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button>Click me</button>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Initially, container should have neither has-value nor has-results
+      const initialClasses = await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
         if (!glass || !glass.shadowRoot)
           return { error: 'no glass' };
 
-        const navContainer = glass.shadowRoot.querySelector('x-pw-search-nav') as HTMLElement;
+        const container = glass.shadowRoot.querySelector('x-pw-search-container');
 
         return {
-          navContainerHidden: navContainer?.style.display === 'none',
+          hasValue: container?.classList.contains('has-value'),
+          hasResults: container?.classList.contains('has-results'),
         };
       });
 
-      expect(initialVisibility.navContainerHidden).toBe(true);
+      expect(initialClasses.hasValue).toBe(false);
+      expect(initialClasses.hasResults).toBe(false);
 
-      // Search for something that exists - buttons should become visible
+      // Search for something that exists - should have both has-value and has-results
       await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
         const input = glass?.shadowRoot?.querySelector('.x-pw-search-input') as HTMLTextAreaElement;
@@ -1481,24 +1531,26 @@ test.describe('FuzzySearchTool', () => {
 
       await page.waitForTimeout(300);
 
-      const visibilityWithResults = await page.evaluate(() => {
+      const classesWithResults = await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
         if (!glass || !glass.shadowRoot)
           return { error: 'no glass' };
 
-        const navContainer = glass.shadowRoot.querySelector('x-pw-search-nav') as HTMLElement;
+        const container = glass.shadowRoot.querySelector('x-pw-search-container');
         const counter = glass.shadowRoot.querySelector('x-pw-search-counter') as HTMLElement;
 
         return {
-          navContainerVisible: navContainer?.style.display !== 'none',
+          hasValue: container?.classList.contains('has-value'),
+          hasResults: container?.classList.contains('has-results'),
           counterText: counter?.textContent,
         };
       });
 
-      expect(visibilityWithResults.navContainerVisible).toBe(true);
-      expect(visibilityWithResults.counterText).toBe('1/1');
+      expect(classesWithResults.hasValue).toBe(true);
+      expect(classesWithResults.hasResults).toBe(true);
+      expect(classesWithResults.counterText).toBe('1/1');
 
-      // Search for something that doesn't exist - buttons should be hidden again
+      // Search for something that doesn't exist - should have has-value but NOT has-results
       await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
         const input = glass?.shadowRoot?.querySelector('.x-pw-search-input') as HTMLTextAreaElement;
@@ -1510,21 +1562,23 @@ test.describe('FuzzySearchTool', () => {
 
       await page.waitForTimeout(300);
 
-      const visibilityNoResults = await page.evaluate(() => {
+      const classesNoResults = await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
         if (!glass || !glass.shadowRoot)
           return { error: 'no glass' };
 
-        const navContainer = glass.shadowRoot.querySelector('x-pw-search-nav') as HTMLElement;
+        const container = glass.shadowRoot.querySelector('x-pw-search-container');
 
         return {
-          navContainerHidden: navContainer?.style.display === 'none',
+          hasValue: container?.classList.contains('has-value'),
+          hasResults: container?.classList.contains('has-results'),
         };
       });
 
-      expect(visibilityNoResults.navContainerHidden).toBe(true);
+      expect(classesNoResults.hasValue).toBe(true);
+      expect(classesNoResults.hasResults).toBe(false);
 
-      // Clear search with Escape - buttons should remain hidden
+      // Clear search with Escape - should have neither class
       await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
         const input = glass?.shadowRoot?.querySelector('.x-pw-search-input') as HTMLTextAreaElement;
@@ -1534,19 +1588,21 @@ test.describe('FuzzySearchTool', () => {
 
       await page.waitForTimeout(100);
 
-      const visibilityAfterClear = await page.evaluate(() => {
+      const classesAfterClear = await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
         if (!glass || !glass.shadowRoot)
           return { error: 'no glass' };
 
-        const navContainer = glass.shadowRoot.querySelector('x-pw-search-nav') as HTMLElement;
+        const container = glass.shadowRoot.querySelector('x-pw-search-container');
 
         return {
-          navContainerHidden: navContainer?.style.display === 'none',
+          hasValue: container?.classList.contains('has-value'),
+          hasResults: container?.classList.contains('has-results'),
         };
       });
 
-      expect(visibilityAfterClear.navContainerHidden).toBe(true);
+      expect(classesAfterClear.hasValue).toBe(false);
+      expect(classesAfterClear.hasResults).toBe(false);
     } finally {
       await browser.close();
     }
@@ -1704,163 +1760,21 @@ test.describe('FuzzySearchTool', () => {
 
         const input = glass.shadowRoot.querySelector('.x-pw-search-input');
         const counter = glass.shadowRoot.querySelector('x-pw-search-counter');
-        const prevBtn = glass.shadowRoot.querySelector('x-pw-search-nav-btn.prev');
-        const nextBtn = glass.shadowRoot.querySelector('x-pw-search-nav-btn.next');
+        const container = glass.shadowRoot.querySelector('x-pw-search-container');
 
         return {
           hasNoMatchClass: input?.classList.contains('no-match'),
           counterText: counter?.textContent,
-          prevDisabled: prevBtn?.hasAttribute('disabled'),
-          nextDisabled: nextBtn?.hasAttribute('disabled'),
+          containerHasValue: container?.classList.contains('has-value'),
+          containerHasResults: container?.classList.contains('has-results'),
         };
       });
 
       expect(noMatchState.hasNoMatchClass).toBe(true);
       expect(noMatchState.counterText).toBe('');
-      expect(noMatchState.prevDisabled).toBe(true);
-      expect(noMatchState.nextDisabled).toBe(true);
-    } finally {
-      await browser.close();
-    }
-  });
-
-  test('should navigate through matches with prev/next buttons', async () => {
-    const playwright = createInProcessPlaywright();
-    const browser = await playwright.chromium.launch({ headless: true });
-    const context = await browser.newContext();
-
-    try {
-      await (context as any)._enableRecorder({
-        mode: 'recording',
-        customization: {
-          elementFactories: searchFactories,
-        },
-      });
-
-      const page = await context.newPage();
-      await page.setContent(`
-        <button class="btn">First</button>
-        <button class="btn">Second</button>
-        <button class="btn">Third</button>
-      `);
-      await page.waitForSelector('x-pw-glass');
-
-      // Search for buttons
-      await page.evaluate(() => {
-        const glass = document.querySelector('x-pw-glass');
-        const input = glass?.shadowRoot?.querySelector('.x-pw-search-input') as HTMLTextAreaElement;
-        if (input) {
-          input.value = 'button';
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-      });
-
-      await page.waitForTimeout(300);
-
-      // Get initial state
-      const initialState = await page.evaluate(() => {
-        const glass = document.querySelector('x-pw-glass');
-        const counter = glass?.shadowRoot?.querySelector('x-pw-search-counter');
-        return counter?.textContent;
-      });
-
-      expect(initialState).toBe('1/3');
-
-      // Click next button
-      await page.evaluate(() => {
-        const glass = document.querySelector('x-pw-glass');
-        const nextBtn = glass?.shadowRoot?.querySelector('x-pw-search-nav-btn.next') as HTMLElement;
-        nextBtn?.click();
-      });
-
-      await page.waitForTimeout(100);
-
-      const afterNext = await page.evaluate(() => {
-        const glass = document.querySelector('x-pw-glass');
-        const counter = glass?.shadowRoot?.querySelector('x-pw-search-counter');
-        return counter?.textContent;
-      });
-
-      expect(afterNext).toBe('2/3');
-
-      // Click prev button
-      await page.evaluate(() => {
-        const glass = document.querySelector('x-pw-glass');
-        const prevBtn = glass?.shadowRoot?.querySelector('x-pw-search-nav-btn.prev') as HTMLElement;
-        prevBtn?.click();
-      });
-
-      await page.waitForTimeout(100);
-
-      const afterPrev = await page.evaluate(() => {
-        const glass = document.querySelector('x-pw-glass');
-        const counter = glass?.shadowRoot?.querySelector('x-pw-search-counter');
-        return counter?.textContent;
-      });
-
-      expect(afterPrev).toBe('1/3');
-    } finally {
-      await browser.close();
-    }
-  });
-
-  test('should wrap around when navigating past first/last match', async () => {
-    const playwright = createInProcessPlaywright();
-    const browser = await playwright.chromium.launch({ headless: true });
-    const context = await browser.newContext();
-
-    try {
-      await (context as any)._enableRecorder({
-        mode: 'recording',
-        customization: {
-          elementFactories: searchFactories,
-        },
-      });
-
-      const page = await context.newPage();
-      await page.setContent(`
-        <button>First</button>
-        <button>Second</button>
-      `);
-      await page.waitForSelector('x-pw-glass');
-
-      // Search for buttons
-      await page.evaluate(() => {
-        const glass = document.querySelector('x-pw-glass');
-        const input = glass?.shadowRoot?.querySelector('.x-pw-search-input') as HTMLTextAreaElement;
-        if (input) {
-          input.value = 'button';
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-      });
-
-      await page.waitForTimeout(300);
-
-      // Go to second match
-      await page.evaluate(() => {
-        const glass = document.querySelector('x-pw-glass');
-        const nextBtn = glass?.shadowRoot?.querySelector('x-pw-search-nav-btn.next') as HTMLElement;
-        nextBtn?.click();
-      });
-
-      await page.waitForTimeout(100);
-
-      // Now click next again - should wrap to first
-      await page.evaluate(() => {
-        const glass = document.querySelector('x-pw-glass');
-        const nextBtn = glass?.shadowRoot?.querySelector('x-pw-search-nav-btn.next') as HTMLElement;
-        nextBtn?.click();
-      });
-
-      await page.waitForTimeout(100);
-
-      const afterWrap = await page.evaluate(() => {
-        const glass = document.querySelector('x-pw-glass');
-        const counter = glass?.shadowRoot?.querySelector('x-pw-search-counter');
-        return counter?.textContent;
-      });
-
-      expect(afterWrap).toBe('1/2');
+      // Container should still have has-value (input has text) but NOT has-results
+      expect(noMatchState.containerHasValue).toBe(true);
+      expect(noMatchState.containerHasResults).toBe(false);
     } finally {
       await browser.close();
     }
@@ -1933,7 +1847,7 @@ test.describe('FuzzySearchTool', () => {
     }
   });
 
-  test('should navigate with Enter (next) and Shift+Enter (prev)', async () => {
+  test('should navigate to next and previous matches with Enter key', async () => {
     const playwright = createInProcessPlaywright();
     const browser = await playwright.chromium.launch({ headless: true });
     const context = await browser.newContext();
@@ -1966,43 +1880,106 @@ test.describe('FuzzySearchTool', () => {
 
       await page.waitForTimeout(300);
 
-      // Press Enter to go to next
+      // Verify initial state (first match)
+      const initialState = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const counter = glass?.shadowRoot?.querySelector('x-pw-search-counter');
+        return counter?.textContent;
+      });
+      expect(initialState).toBe('1/3');
+
+      // Navigate to next match using Enter key (like Escape test uses dispatchEvent)
       await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
         const input = glass?.shadowRoot?.querySelector('.x-pw-search-input') as HTMLTextAreaElement;
         if (input)
           input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-
       });
-
       await page.waitForTimeout(100);
 
-      const afterEnter = await page.evaluate(() => {
+      const afterNext = await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
         const counter = glass?.shadowRoot?.querySelector('x-pw-search-counter');
         return counter?.textContent;
       });
+      expect(afterNext).toBe('2/3');
 
-      expect(afterEnter).toBe('2/3');
-
-      // Press Shift+Enter to go to prev
+      // Navigate to previous match using Shift+Enter
       await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
         const input = glass?.shadowRoot?.querySelector('.x-pw-search-input') as HTMLTextAreaElement;
         if (input)
           input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, bubbles: true }));
-
       });
-
       await page.waitForTimeout(100);
 
-      const afterShiftEnter = await page.evaluate(() => {
+      const afterPrev = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const counter = glass?.shadowRoot?.querySelector('x-pw-search-counter');
+        return counter?.textContent;
+      });
+      expect(afterPrev).toBe('1/3');
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should wrap around when navigating past first/last match', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+        customization: {
+          elementFactories: searchFactories,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`
+        <button>First</button>
+        <button>Second</button>
+      `);
+      await page.waitForSelector('x-pw-glass');
+
+      // Search for buttons
+      await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        const input = glass?.shadowRoot?.querySelector('.x-pw-search-input') as HTMLTextAreaElement;
+        if (input) {
+          input.value = 'button';
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      });
+
+      await page.waitForTimeout(300);
+
+      // Helper to navigate to next match using Enter key
+      const navigateNext = async () => {
+        await page.evaluate(() => {
+          const glass = document.querySelector('x-pw-glass');
+          const input = glass?.shadowRoot?.querySelector('.x-pw-search-input') as HTMLTextAreaElement;
+          if (input)
+            input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+        });
+        await page.waitForTimeout(100);
+      };
+
+      // Go to second match
+      await navigateNext();
+
+      // Now navigate again - should wrap to first
+      await navigateNext();
+
+      const afterWrap = await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
         const counter = glass?.shadowRoot?.querySelector('x-pw-search-counter');
         return counter?.textContent;
       });
 
-      expect(afterShiftEnter).toBe('1/3');
+      expect(afterWrap).toBe('1/2');
     } finally {
       await browser.close();
     }
@@ -2260,7 +2237,7 @@ test.describe('FuzzySearchTool', () => {
     }
   });
 
-  test('should navigate with F3 (next) and Shift+F3 (prev)', async () => {
+  test('should auto-scroll first match into view on search', async () => {
     const playwright = createInProcessPlaywright();
     const browser = await playwright.chromium.launch({ headless: true });
     const context = await browser.newContext();
@@ -2274,117 +2251,29 @@ test.describe('FuzzySearchTool', () => {
       });
 
       const page = await context.newPage();
-      await page.setContent(`
-        <button>A</button>
-        <button>B</button>
-        <button>C</button>
-      `);
-      await page.waitForSelector('x-pw-glass');
-
-      // Search for buttons
-      await page.evaluate(() => {
-        const glass = document.querySelector('x-pw-glass');
-        const input = glass?.shadowRoot?.querySelector('.x-pw-search-input') as HTMLTextAreaElement;
-        if (input) {
-          input.value = 'button';
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-      });
-
-      await page.waitForTimeout(300);
-
-      // Verify initial state
-      const initialState = await page.evaluate(() => {
-        const glass = document.querySelector('x-pw-glass');
-        const counter = glass?.shadowRoot?.querySelector('x-pw-search-counter');
-        return counter?.textContent;
-      });
-      expect(initialState).toBe('1/3');
-
-      // Press F3 to go to next
-      await page.evaluate(() => {
-        const glass = document.querySelector('x-pw-glass');
-        const input = glass?.shadowRoot?.querySelector('.x-pw-search-input') as HTMLTextAreaElement;
-        if (input)
-          input.dispatchEvent(new KeyboardEvent('keydown', { key: 'F3', bubbles: true }));
-      });
-
-      await page.waitForTimeout(100);
-
-      const afterF3 = await page.evaluate(() => {
-        const glass = document.querySelector('x-pw-glass');
-        const counter = glass?.shadowRoot?.querySelector('x-pw-search-counter');
-        return counter?.textContent;
-      });
-      expect(afterF3).toBe('2/3');
-
-      // Press Shift+F3 to go to prev
-      await page.evaluate(() => {
-        const glass = document.querySelector('x-pw-glass');
-        const input = glass?.shadowRoot?.querySelector('.x-pw-search-input') as HTMLTextAreaElement;
-        if (input)
-          input.dispatchEvent(new KeyboardEvent('keydown', { key: 'F3', shiftKey: true, bubbles: true }));
-      });
-
-      await page.waitForTimeout(100);
-
-      const afterShiftF3 = await page.evaluate(() => {
-        const glass = document.querySelector('x-pw-glass');
-        const counter = glass?.shadowRoot?.querySelector('x-pw-search-counter');
-        return counter?.textContent;
-      });
-      expect(afterShiftF3).toBe('1/3');
-    } finally {
-      await browser.close();
-    }
-  });
-
-  test('should auto-scroll current match into view', async () => {
-    const playwright = createInProcessPlaywright();
-    const browser = await playwright.chromium.launch({ headless: true });
-    const context = await browser.newContext();
-
-    try {
-      await (context as any)._enableRecorder({
-        mode: 'recording',
-        customization: {
-          elementFactories: searchFactories,
-        },
-      });
-
-      const page = await context.newPage();
-      // Create a page with many elements so scrolling is needed
+      // Create a page with the button off-screen (below viewport)
       await page.setContent(`
         <div style="height: 2000px;">
-          <button id="top-btn">Top Button</button>
+          <!-- Spacer to push button below viewport -->
         </div>
         <button id="bottom-btn">Bottom Button</button>
       `);
       await page.waitForSelector('x-pw-glass');
 
-      // Get initial scroll position
+      // Get initial scroll position (should be at top)
       const initialScroll = await page.evaluate(() => window.scrollY);
 
-      // Search for buttons
+      // Search for the bottom button specifically
       await page.evaluate(() => {
         const glass = document.querySelector('x-pw-glass');
         const input = glass?.shadowRoot?.querySelector('.x-pw-search-input') as HTMLTextAreaElement;
         if (input) {
-          input.value = 'button';
+          input.value = '#bottom-btn';
           input.dispatchEvent(new Event('input', { bubbles: true }));
         }
       });
 
-      await page.waitForTimeout(300);
-
-      // Navigate to second match (bottom button)
-      await page.evaluate(() => {
-        const glass = document.querySelector('x-pw-glass');
-        const nextBtn = glass?.shadowRoot?.querySelector('x-pw-search-nav-btn.next') as HTMLElement;
-        nextBtn?.click();
-      });
-
-      // Wait for smooth scroll
+      // Wait for debounce and smooth scroll
       await page.waitForTimeout(500);
 
       // Check scroll position changed
