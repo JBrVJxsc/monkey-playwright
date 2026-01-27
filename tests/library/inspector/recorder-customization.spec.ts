@@ -3291,3 +3291,473 @@ test.describe('pick locator dialog', () => {
     }
   });
 });
+
+/**
+ * Expandable Toolbar Labels Integration Tests
+ *
+ * These tests verify the expandable label behavior for toolbar buttons.
+ * Labels expand on hover to show button descriptions, then collapse
+ * when mouse leaves - similar to the search UI expand/collapse pattern.
+ */
+test.describe('Expandable toolbar labels', () => {
+  // Element factories that include expandable labels
+  const expandableLabelFactories = `
+    module.exports = {
+      createToolItem: (doc, name, title) => {
+        const el = doc.createElement('x-pw-tool-item');
+        el.classList.add(name);
+
+        // Record button needs both record and stop icons for toggled state
+        if (name === 'record') {
+          const recordIcon = doc.createElement('x-div');
+          recordIcon.classList.add('icon-record');
+          el.appendChild(recordIcon);
+
+          const stopIcon = doc.createElement('x-div');
+          stopIcon.classList.add('icon-stop');
+          el.appendChild(stopIcon);
+
+          // Record button has two labels for different states
+          const recordLabel = doc.createElement('x-pw-tool-label');
+          recordLabel.classList.add('label-record');
+          recordLabel.textContent = 'Record';
+          el.appendChild(recordLabel);
+
+          const stopLabel = doc.createElement('x-pw-tool-label');
+          stopLabel.classList.add('label-stop');
+          stopLabel.textContent = 'Stop';
+          el.appendChild(stopLabel);
+        } else {
+          const icon = doc.createElement('x-div');
+          icon.classList.add('tool-icon');
+          el.appendChild(icon);
+
+          // Add expandable label for non-record buttons
+          if (title) {
+            const label = doc.createElement('x-pw-tool-label');
+            label.textContent = title;
+            el.appendChild(label);
+          }
+        }
+
+        return el;
+      },
+    };
+  `;
+
+  // CSS for expandable labels - matches the pattern from highlight.css
+  const expandableLabelCSS = `
+    :host {
+      --pw-ease: cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    x-pw-tool-item {
+      --label-expand-duration: 200ms;
+      --label-collapse-duration: 150ms;
+      --label-expand-delay: 150ms;
+      --label-collapse-delay: 50ms;
+      position: relative; /* For absolute positioned labels */
+      display: flex;
+      align-items: center;
+      height: 28px;
+      min-width: 28px;
+      padding: 0 6px;
+    }
+
+    x-pw-tool-item > x-div {
+      width: 16px;
+      height: 16px;
+      background-color: #333;
+      flex-shrink: 0;
+    }
+
+    x-pw-tool-label {
+      position: absolute;
+      left: 50%;
+      top: calc(100% + 12px);
+      transform: translateX(-50%) translateY(-4px);
+      white-space: nowrap;
+      font-size: 12px;
+      font-weight: 500;
+      line-height: 1;
+      padding: 5px 10px;
+      background-color: #242424;
+      color: #fff;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      border-radius: 4px;
+      pointer-events: none;
+      z-index: 100;
+      opacity: 0;
+      transition:
+        opacity var(--label-collapse-duration) var(--pw-ease) var(--label-collapse-delay),
+        transform var(--label-collapse-duration) var(--pw-ease) var(--label-collapse-delay);
+    }
+
+    x-pw-tool-item:not(.disabled):hover > x-pw-tool-label {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+      transition:
+        opacity var(--label-expand-duration) var(--pw-ease) var(--label-expand-delay),
+        transform var(--label-expand-duration) var(--pw-ease) var(--label-expand-delay);
+    }
+
+    /* Record button label states - use visibility for smoother transitions */
+    x-pw-tool-item.record > x-pw-tool-label.label-record {
+      /* Shown when not recording */
+    }
+
+    x-pw-tool-item.record > x-pw-tool-label.label-stop {
+      display: none !important;
+    }
+
+    x-pw-tool-item.record.toggled > x-pw-tool-label.label-record {
+      display: none !important;
+    }
+
+    x-pw-tool-item.record.toggled > x-pw-tool-label.label-stop {
+      display: inline-block !important;
+    }
+
+    /* Record icon states */
+    x-pw-tool-item.record > x-div.icon-record {
+      display: block;
+    }
+
+    x-pw-tool-item.record > x-div.icon-stop {
+      display: none;
+    }
+
+    x-pw-tool-item.record.toggled > x-div.icon-record {
+      display: none;
+    }
+
+    x-pw-tool-item.record.toggled > x-div.icon-stop {
+      display: block;
+    }
+
+    x-pw-tools-list {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 8px;
+    }
+  `;
+
+  test('should create tool items with expandable label elements', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+        customization: {
+          elementFactories: expandableLabelFactories,
+          highlightCSS: expandableLabelCSS,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button>Click me</button>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Check that tool items have label elements
+      const toolItemInfo = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        if (!glass || !glass.shadowRoot)
+          return null;
+
+        const pickLocatorTool = glass.shadowRoot.querySelector('x-pw-tool-item.pick-locator');
+        const recordTool = glass.shadowRoot.querySelector('x-pw-tool-item.record');
+
+        return {
+          pickLocatorHasLabel: !!pickLocatorTool?.querySelector('x-pw-tool-label'),
+          pickLocatorLabelText: pickLocatorTool?.querySelector('x-pw-tool-label')?.textContent,
+          recordHasRecordLabel: !!recordTool?.querySelector('x-pw-tool-label.label-record'),
+          recordHasStopLabel: !!recordTool?.querySelector('x-pw-tool-label.label-stop'),
+          recordLabelText: recordTool?.querySelector('x-pw-tool-label.label-record')?.textContent,
+          stopLabelText: recordTool?.querySelector('x-pw-tool-label.label-stop')?.textContent,
+        };
+      });
+
+      expect(toolItemInfo).toBeTruthy();
+      expect(toolItemInfo!.pickLocatorHasLabel).toBe(true);
+      expect(toolItemInfo!.pickLocatorLabelText).toBeTruthy();
+      expect(toolItemInfo!.recordHasRecordLabel).toBe(true);
+      expect(toolItemInfo!.recordHasStopLabel).toBe(true);
+      expect(toolItemInfo!.recordLabelText).toBe('Record');
+      expect(toolItemInfo!.stopLabelText).toBe('Stop');
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should have labels collapsed by default (opacity: 0, positioned absolutely)', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+        customization: {
+          elementFactories: expandableLabelFactories,
+          highlightCSS: expandableLabelCSS,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button>Click me</button>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Check that labels are collapsed by default
+      const labelStyles = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        if (!glass || !glass.shadowRoot)
+          return null;
+
+        const pickLocatorTool = glass.shadowRoot.querySelector('x-pw-tool-item.pick-locator');
+        const label = pickLocatorTool?.querySelector('x-pw-tool-label');
+
+        if (!label)
+          return null;
+
+        const style = getComputedStyle(label);
+        return {
+          position: style.position,
+          opacity: style.opacity,
+          pointerEvents: style.pointerEvents,
+        };
+      });
+
+      expect(labelStyles).toBeTruthy();
+      // Labels use absolute positioning to avoid layout shift
+      expect(labelStyles!.position).toBe('absolute');
+      expect(labelStyles!.opacity).toBe('0');
+      // Labels don't interfere with mouse events
+      expect(labelStyles!.pointerEvents).toBe('none');
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should have CSS rules for hover expansion with absolute positioning', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+        customization: {
+          elementFactories: expandableLabelFactories,
+          highlightCSS: expandableLabelCSS,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button>Click me</button>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Check that CSS rules for hover expansion are properly defined
+      const cssInfo = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        if (!glass || !glass.shadowRoot)
+          return { error: 'no glass' };
+
+        const pickLocatorTool = glass.shadowRoot.querySelector('x-pw-tool-item.pick-locator');
+        const label = pickLocatorTool?.querySelector('x-pw-tool-label');
+
+        if (!label)
+          return { error: 'no label', pickLocatorExists: !!pickLocatorTool };
+
+        // Get the computed style properties that should be set for animation
+        const style = getComputedStyle(label);
+        return {
+          hasLabel: true,
+          position: style.position,
+          opacity: style.opacity,
+          zIndex: style.zIndex,
+          // Check if transition is configured for opacity and transform
+          hasTransition: style.transition !== '' && style.transition !== 'none' && style.transition !== 'all 0s ease 0s',
+          transition: style.transition,
+        };
+      });
+
+      expect(cssInfo).toBeTruthy();
+      expect(cssInfo).not.toHaveProperty('error');
+      expect(cssInfo.hasLabel).toBe(true);
+      // Label uses absolute positioning to avoid layout shift
+      expect(cssInfo.position).toBe('absolute');
+      expect(cssInfo.opacity).toBe('0');
+      // Label should have z-index for proper stacking
+      expect(parseInt(cssInfo.zIndex, 10)).toBeGreaterThan(0);
+      // Transition should be configured for smooth animation
+      expect(cssInfo.hasTransition).toBe(true);
+      expect(cssInfo.transition).toContain('opacity');
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should have labels that do not cause layout shift (absolute positioning)', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+        customization: {
+          elementFactories: expandableLabelFactories,
+          highlightCSS: expandableLabelCSS,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button>Click me</button>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Verify that labels use absolute positioning to avoid layout shift
+      // This is the key fix for the "flashy" behavior when hovering across icons
+      const layoutInfo = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        if (!glass || !glass.shadowRoot)
+          return null;
+
+        const toolItem = glass.shadowRoot.querySelector('x-pw-tool-item.pick-locator');
+        const label = toolItem?.querySelector('x-pw-tool-label');
+
+        if (!toolItem || !label)
+          return null;
+
+        const toolStyle = getComputedStyle(toolItem);
+        const labelStyle = getComputedStyle(label);
+
+        return {
+          // Tool item must have position: relative for absolute child
+          toolPosition: toolStyle.position,
+          // Label must be absolute to not affect layout
+          labelPosition: labelStyle.position,
+          // Label should be hidden initially
+          labelOpacity: labelStyle.opacity,
+          // Label should not block mouse events
+          labelPointerEvents: labelStyle.pointerEvents,
+        };
+      });
+
+      expect(layoutInfo).toBeTruthy();
+      // Tool item is the positioning context
+      expect(layoutInfo!.toolPosition).toBe('relative');
+      // Label uses absolute positioning - doesn't push siblings when expanding
+      expect(layoutInfo!.labelPosition).toBe('absolute');
+      // Hidden by default
+      expect(layoutInfo!.labelOpacity).toBe('0');
+      // Doesn't interfere with clicking
+      expect(layoutInfo!.labelPointerEvents).toBe('none');
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should show correct label for record button based on toggled state', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+        customization: {
+          elementFactories: expandableLabelFactories,
+          highlightCSS: expandableLabelCSS,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button>Click me</button>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Check initial state - record button is toggled (recording mode)
+      const initialState = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        if (!glass || !glass.shadowRoot)
+          return null;
+
+        const recordTool = glass.shadowRoot.querySelector('x-pw-tool-item.record');
+        const recordLabel = recordTool?.querySelector('x-pw-tool-label.label-record');
+        const stopLabel = recordTool?.querySelector('x-pw-tool-label.label-stop');
+
+        if (!recordLabel || !stopLabel)
+          return null;
+
+        const isToggled = recordTool?.classList.contains('toggled');
+        const recordStyle = getComputedStyle(recordLabel);
+        const stopStyle = getComputedStyle(stopLabel);
+
+        return {
+          isToggled,
+          recordLabelDisplay: recordStyle.display,
+          stopLabelDisplay: stopStyle.display,
+        };
+      });
+
+      expect(initialState).toBeTruthy();
+      // In recording mode, button should be toggled
+      expect(initialState!.isToggled).toBe(true);
+      // When toggled, "Record" label should be hidden, "Stop" label visible
+      expect(initialState!.recordLabelDisplay).toBe('none');
+      // Stop label should be visible (inline-block or block depending on CSS)
+      expect(['inline-block', 'block']).toContain(initialState!.stopLabelDisplay);
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('should have smooth transition timing variables defined', async () => {
+    const playwright = createInProcessPlaywright();
+    const browser = await playwright.chromium.launch({ headless: true });
+    const context = await browser.newContext();
+
+    try {
+      await (context as any)._enableRecorder({
+        mode: 'recording',
+        customization: {
+          elementFactories: expandableLabelFactories,
+          highlightCSS: expandableLabelCSS,
+        },
+      });
+
+      const page = await context.newPage();
+      await page.setContent(`<button>Click me</button>`);
+      await page.waitForSelector('x-pw-glass');
+
+      // Check that CSS variables are defined on tool items
+      const cssVariables = await page.evaluate(() => {
+        const glass = document.querySelector('x-pw-glass');
+        if (!glass || !glass.shadowRoot)
+          return null;
+
+        const tool = glass.shadowRoot.querySelector('x-pw-tool-item');
+        if (!tool)
+          return null;
+
+        const style = getComputedStyle(tool);
+        return {
+          expandDuration: style.getPropertyValue('--label-expand-duration').trim(),
+          collapseDuration: style.getPropertyValue('--label-collapse-duration').trim(),
+          expandDelay: style.getPropertyValue('--label-expand-delay').trim(),
+          collapseDelay: style.getPropertyValue('--label-collapse-delay').trim(),
+        };
+      });
+
+      expect(cssVariables).toBeTruthy();
+      expect(cssVariables!.expandDuration).toBe('200ms');
+      expect(cssVariables!.collapseDuration).toBe('150ms');
+      expect(cssVariables!.expandDelay).toBe('150ms'); // Hover intent - prevents flash when scanning
+      expect(cssVariables!.collapseDelay).toBe('50ms'); // Short delay prevents flicker
+    } finally {
+      await browser.close();
+    }
+  });
+});
