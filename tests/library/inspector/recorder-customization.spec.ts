@@ -3320,12 +3320,12 @@ test.describe('Expandable toolbar labels', () => {
           // Record button has two labels for different states
           const recordLabel = doc.createElement('x-pw-tool-label');
           recordLabel.classList.add('label-record');
-          recordLabel.textContent = 'Record';
+          recordLabel.textContent = 'Start Recording';
           el.appendChild(recordLabel);
 
           const stopLabel = doc.createElement('x-pw-tool-label');
           stopLabel.classList.add('label-stop');
-          stopLabel.textContent = 'Stop';
+          stopLabel.textContent = 'Stop Recording';
           el.appendChild(stopLabel);
         } else {
           const icon = doc.createElement('x-div');
@@ -3485,8 +3485,8 @@ test.describe('Expandable toolbar labels', () => {
       expect(toolItemInfo!.pickLocatorLabelText).toBeTruthy();
       expect(toolItemInfo!.recordHasRecordLabel).toBe(true);
       expect(toolItemInfo!.recordHasStopLabel).toBe(true);
-      expect(toolItemInfo!.recordLabelText).toBe('Record');
-      expect(toolItemInfo!.stopLabelText).toBe('Stop');
+      expect(toolItemInfo!.recordLabelText).toBe('Start Recording');
+      expect(toolItemInfo!.stopLabelText).toBe('Stop Recording');
     } finally {
       await browser.close();
     }
