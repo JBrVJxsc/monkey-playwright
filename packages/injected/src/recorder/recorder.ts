@@ -1556,9 +1556,7 @@ class Overlay {
       state.mode === 'assertingSnapshot' ||
       state.mode === 'recording-inspecting';
     this._recordToggle.classList.toggle('toggled', isRecording);
-    this._recordToggle.title = isRecording
-      ? 'Stop Recording'
-      : 'Start Recording';
+    // Native title tooltip removed - using custom x-pw-tool-label tooltips instead
     this._pickLocatorToggle.classList.toggle(
         'toggled',
         state.mode === 'inspecting' || state.mode === 'recording-inspecting',
